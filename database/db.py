@@ -220,7 +220,7 @@ def get_campaign_leads(campaign_id: int, path: str | None = None) -> list[dict[s
         rows = conn.execute("""
             SELECT l.*, e.status AS campaign_status, e.consent_confirmed
             FROM campaign_events e JOIN leads l ON l.id=e.lead_id
-            WHERE e.campaign_id=? ORDER BY l.name
+            WHERE e.campaign_id=? AND l.status <> 'in_person' ORDER BY l.name
         """, (campaign_id,))
         return [dict(row) for row in rows]
 
