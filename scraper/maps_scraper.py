@@ -35,10 +35,10 @@ async def search_google_maps(term: str, limit: int = 10) -> list[dict[str, str]]
         page = await context.new_page()
         try:
             await page.goto(f"https://www.google.com/maps/search/{quote_plus(term)}",
-                            wait_until="domcontentloaded", timeout=60000)
+                            wait_until="domcontentloaded", timeout=35000)
             feed = page.locator('div[role="feed"]')
             try:
-                await feed.wait_for(timeout=15000)
+                await feed.wait_for(timeout=9000)
             except PlaywrightTimeoutError:
                 logger.warning("Lista indisponível; o Maps pode ter mudado ou limitado o acesso.")
                 return []
@@ -90,7 +90,7 @@ async def search_google_maps(term: str, limit: int = 10) -> list[dict[str, str]]
 
             for lead in candidates:
                 try:
-                    await page.goto(lead["link"], wait_until="domcontentloaded", timeout=30000)
+                    await page.goto(lead["link"], wait_until="domcontentloaded", timeout=18000)
                     for selector, field in [
                         ('button[data-item-id^="phone:tel:"]', "phone"),
                         ('button[data-item-id="address"]', "address"),
