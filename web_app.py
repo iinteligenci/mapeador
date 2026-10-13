@@ -9,10 +9,10 @@ from datetime import datetime
 from typing import Any
 
 from dotenv import load_dotenv
-from flask import Flask, render_template_string, request
+from flask import Flask, redirect, render_template_string, request, url_for
 
 from ai_agent.analyzer import analyze_lead
-from database.db import init_db, save_lead, update_analysis
+from database.db import get_leads, init_db, save_lead, update_analysis, update_lead_status
 from scraper.maps_scraper import search_google_maps
 from scraper.site_research import research_public_site
 
@@ -41,14 +41,14 @@ button{border:0;border-radius:10px;padding:12px 18px;background:var(--blue);colo
 .results{display:grid;gap:14px}.lead{border:1px solid var(--line);background:#0d1829;border-radius:14px;padding:18px}.leadhead{display:flex;justify-content:space-between;gap:16px;align-items:start}.lead h3{margin:0 0 4px;font-size:18px}.category{color:var(--muted);font-size:13px}.score{white-space:nowrap;border-radius:99px;padding:5px 10px;background:#123a35;color:#83f0ce;font-weight:700;font-size:13px}.score.unknown{background:#302a1d;color:#ffdb91}
 .details{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:15px}.detail{border-top:1px solid #26354d;padding-top:9px;min-width:0}.detail b{display:block;color:var(--muted);font-size:12px;font-weight:500}.detail a{color:#83c5ff;overflow-wrap:anywhere}.detail div{overflow-wrap:anywhere}
 .analysis{margin-top:15px;padding:13px;border-radius:10px;background:#14243a}.analysis b{font-size:13px}.analysis p{margin:5px 0}.draft{margin-top:10px;padding:12px;border-left:3px solid var(--blue);background:#101e31;white-space:pre-wrap}
-.empty{color:var(--muted);padding:18px 0}.footer{font-size:12px;color:var(--muted);text-align:center;margin-top:24px}
+.statusform{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}.statusform select{max-width:220px}.statusform button{margin:0;padding:10px 13px}.nav{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0}.nav a{color:#b9dcff;text-decoration:none;border:1px solid #354761;background:#122039;padding:9px 13px;border-radius:10px}.nav a:hover{border-color:var(--blue)}.empty{color:var(--muted);padding:18px 0}.footer{font-size:12px;color:var(--muted);text-align:center;margin-top:24px}
 @media(max-width:720px){main{padding:22px 14px}.formgrid,.stats,.details{grid-template-columns:1fr}h1{font-size:24px}.leadhead{flex-direction:column}.score{align-self:start}}
 </style>
 </head>
 <body><main>
 <header>
  <div class="brand"><div class="mark">M</div><div><h1>Mapeador</h1><div class="category">Inteligência comercial para negócios alimentícios</div></div></div>
- <p class="sub">Encontre estabelecimentos, investigue sua presença digital e organize oportunidades para revisão humana.</p>
+ <p class="sub">Encontre estabelecimentos, investigue sua presença digital e organize oportunidades para revisão humana.</p>\n <nav class="nav"><a href="/">＋ Nova prospecção</a><a href="/history">▤ Restaurantes já pesquisados</a></nav>
 </header>
 <section class="panel">
  <h2>Nova prospecção</h2>
@@ -69,9 +69,9 @@ button{border:0;border-radius:10px;padding:12px 18px;background:var(--blue);colo
  <div class="stats">
   <div class="stat"><strong>{{ results|length }}</strong><span>Estabelecimentos encontrados</span></div>
   <div class="stat"><strong>{{ analyzed }}</strong><span>Análises de IA concluídas</span></div>
-  <div class="stat"><strong>{{ failed }}</strong><span>Análises pendentes ou com erro</span></div>
+  <div class="stat"><strong>{{ failed }}</strong><span>Análises pendentes ou com erro</span></div>\n  <div class="stat"><strong>{{ skipped }}</strong><span>Já pesquisados — ignorados</span></div>
  </div>
- {% if results|length == 0 %}<p class="empty">Nenhum estabelecimento retornado. Tente outro termo ou localidade.</p>{% else %}
+ {% if results|length == 0 %}<p class="empty">{% if skipped %}Todos os estabelecimentos encontrados já estavam cadastrados. Não repetimos a análise. Confira a aba “Restaurantes já pesquisados”.{% else %}Nenhum estabelecimento novo retornado. Tente outro termo ou localidade.{% endif %}</p>{% else %}
  <div class="results" style="margin-top:16px">
  {% for item in results %}
   {% set lead = item.lead %}{% set research = item.research %}{% set analysis = item.analysis %}
@@ -95,6 +95,16 @@ button{border:0;border-radius:10px;padding:12px 18px;background:var(--blue);colo
    {% else %}
    <div class="alert" style="margin-top:14px">{{ item.error or "Análise de IA não concluída. Os dados públicos coletados continuam disponíveis." }}</div>
    {% endif %}
+   <form class="statusform" method="post" action="/status">
+    <input type="hidden" name="lead_id" value="{{ item.lead_id }}">
+    <label for="status-{{ item.lead_id }}" style="margin:0">Etapa comercial</label>
+    <select id="status-{{ item.lead_id }}" name="status">
+      <option value="to_visit" selected>Para visitar</option>
+      <option value="visited">Visitado</option>
+      <option value="client">Cliente</option>
+    </select>
+    <button type="submit">Salvar etapa</button>
+   </form>
    {% if research.research_notes %}<div class="note">{{ research.research_notes|join(" ") }}</div>{% endif %}
    {% if lead.link %}<div class="note"><a href="{{lead.link}}" target="_blank" rel="noopener">Ver no Google Maps ↗</a></div>{% endif %}
   </article>
@@ -133,7 +143,7 @@ def search():
     if not term:
         return render_template_string(
             PAGE, term=term, limit=limit, offer=offer, results=None,
-            analyzed=0, failed=0, error="Informe o que pesquisar e a localidade."
+            analyzed=0, failed=0, skipped=0, error="Informe o que pesquisar e a localidade."
         ), 400
 
     db_path = os.getenv("DATABASE_PATH", "data/mapeador.sqlite3")
@@ -143,7 +153,7 @@ def search():
     except Exception as exc:
         return render_template_string(
             PAGE, term=term, limit=limit, offer=offer, results=[],
-            analyzed=0, failed=0, error=f"Falha na pesquisa do Maps: {type(exc).__name__}: {exc}"
+            analyzed=0, failed=0, skipped=0, error=f"Falha na pesquisa do Maps: {type(exc).__name__}: {exc}"
         ), 500
 
     results: list[dict[str, Any]] = []
@@ -182,12 +192,88 @@ def search():
                 update_analysis(lead_id, analysis, db_path)
         except Exception as exc:
             error = f"IA não concluiu ({type(exc).__name__}). Os dados coletados foram mantidos."
-        results.append({"lead": lead, "research": research, "analysis": analysis, "error": error})
+        results.append({"lead": lead, "lead_id": lead_id, "research": research, "analysis": analysis, "error": error})
 
     return render_template_string(
         PAGE, term=term, limit=limit, offer=offer, results=results,
-        analyzed=analyzed, failed=len(results) - analyzed, error=None
+        analyzed=analyzed, failed=len(results) - analyzed, skipped=skipped, error=None
     )
+
+
+
+STATUS_LABELS = {
+    "to_visit": "Para visitar",
+    "visited": "Visitado",
+    "client": "Cliente",
+}
+
+
+@app.get("/history")
+def history():
+    db_path = os.getenv("DATABASE_PATH", "data/mapeador.sqlite3")
+    init_db(db_path)
+    selected = (request.args.get("status") or "all").strip()
+    if selected not in {"all", *STATUS_LABELS.keys()}:
+        selected = "all"
+    leads = get_leads(path=db_path)
+    for lead in leads:
+        if lead.get("status") not in STATUS_LABELS:
+            lead["status"] = "to_visit"
+        lead["status_label"] = STATUS_LABELS[lead["status"]]
+    if selected != "all":
+        leads = [lead for lead in leads if lead["status"] == selected]
+    return render_template_string(HISTORY_PAGE, leads=leads, selected=selected, labels=STATUS_LABELS)
+
+
+@app.post("/status")
+def set_status():
+    db_path = os.getenv("DATABASE_PATH", "data/mapeador.sqlite3")
+    try:
+        lead_id = int(request.form.get("lead_id", ""))
+        status = request.form.get("status", "")
+        update_lead_status(lead_id, status, db_path)
+    except (ValueError, TypeError) as exc:
+        return f"Não foi possível atualizar a etapa: {exc}", 400
+    return redirect(request.referrer or url_for("history"))
+
+
+HISTORY_PAGE = r"""
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mapeador | Restaurantes já pesquisados</title>
+<style>
+:root{color-scheme:dark;--line:#26354d;--muted:#a6b4ca;--text:#edf4ff;--blue:#4da3ff}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top left,#162b49 0,#0b1220 48%);font:15px/1.5 Inter,Segoe UI,Arial,sans-serif;color:var(--text)}
+main{max-width:1180px;margin:auto;padding:34px 22px 64px}.brand{display:flex;gap:12px;align-items:center}.mark{width:46px;height:46px;border-radius:14px;background:linear-gradient(135deg,#58b7ff,#5b6cff);display:grid;place-items:center;font-size:24px;font-weight:800}h1{font-size:27px;margin:0}.sub,.muted{color:var(--muted)}.panel{background:#121d30;border:1px solid var(--line);border-radius:16px;padding:20px;margin:18px 0}.nav{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0}.nav a{color:#b9dcff;text-decoration:none;border:1px solid #354761;background:#122039;padding:9px 13px;border-radius:10px}.filters{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 20px}.filters a{padding:8px 12px;border:1px solid var(--line);border-radius:9px;text-decoration:none;color:var(--text)}.filters a.active{background:#1c4772;border-color:#4da3ff}.entry{background:#0d1829;border:1px solid var(--line);border-radius:13px;padding:16px;margin:12px 0}.top{display:flex;justify-content:space-between;gap:12px;align-items:start}.entry h3{margin:0}.pill{border-radius:99px;padding:4px 10px;background:#18344f;color:#b9dcff;font-size:12px}.meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0}.meta div{overflow-wrap:anywhere}.meta b{display:block;font-size:12px;color:var(--muted);font-weight:500}a{color:#83c5ff}select,button{border:1px solid #354761;background:#0c1627;color:var(--text);padding:10px;border-radius:9px;font:inherit}.statusform{display:flex;gap:8px;flex-wrap:wrap;align-items:center;border-top:1px solid var(--line);padding-top:12px}.statusform button{background:var(--blue);color:#071321;font-weight:700;cursor:pointer}.empty{color:var(--muted);padding:22px 0}.hint{font-size:12px;color:var(--muted)}@media(max-width:650px){main{padding:20px 13px}.meta{grid-template-columns:1fr}.top{flex-direction:column}}
+</style></head><body><main>
+<header><div class="brand"><div class="mark">M</div><div><h1>Restaurantes já pesquisados</h1><div class="muted">Seu histórico comercial fica salvo no banco local.</div></div></div>
+<nav class="nav"><a href="/">＋ Nova prospecção</a><a href="/history">▤ Restaurantes já pesquisados</a></nav></header>
+<section class="panel"><h2>{{ leads|length }} estabelecimento(s) nesta lista</h2>
+<div class="filters">
+<a href="/history" class="{{ 'active' if selected == 'all' else '' }}">Todos</a>
+<a href="/history?status=to_visit" class="{{ 'active' if selected == 'to_visit' else '' }}">Para visitar</a>
+<a href="/history?status=visited" class="{{ 'active' if selected == 'visited' else '' }}">Visitados</a>
+<a href="/history?status=client" class="{{ 'active' if selected == 'client' else '' }}">Clientes</a>
+</div>
+{% if not leads %}<div class="empty">Nenhum restaurante nesta categoria ainda. Faça uma prospecção para adicionar empresas ao histórico.</div>{% endif %}
+{% for lead in leads %}<article class="entry">
+<div class="top"><div><h3>{{ lead.name }}</h3><div class="muted">{{ lead.category or "Categoria não identificada" }}</div></div><span class="pill">{{ lead.status_label }}</span></div>
+<div class="meta">
+<div><b>Telefone</b>{{ lead.phone or "Não identificado publicamente" }}</div>
+<div><b>Site</b>{% if lead.website %}<a href="{{lead.website}}" target="_blank" rel="noopener">{{lead.website}}</a>{% else %}Não identificado publicamente{% endif %}</div>
+<div><b>Prioridade preliminar</b>{{ (lead.score|string + "/100") if lead.score is not none else "Ainda não avaliada" }}</div>
+<div><b>Última atualização</b>{{ lead.updated_at }}</div>
+<div><b>Análise</b>{{ lead.justification or "Análise não registrada" }}</div>
+</div>
+{% if lead.message %}<details><summary>Ver rascunho de abordagem (não enviado)</summary><p style="white-space:pre-wrap">{{ lead.message }}</p></details>{% endif %}
+{% if lead.link %}<p><a href="{{lead.link}}" target="_blank" rel="noopener">Abrir no Google Maps ↗</a></p>{% endif %}
+<form class="statusform" method="post" action="/status"><input type="hidden" name="lead_id" value="{{lead.id}}">
+<label for="history-status-{{lead.id}}" class="muted">Alterar etapa:</label>
+<select id="history-status-{{lead.id}}" name="status">{% for value,label in labels.items() %}<option value="{{value}}" {% if lead.status == value %}selected{% endif %}>{{label}}</option>{% endfor %}</select>
+<button type="submit">Salvar</button></form>
+</article>{% endfor %}
+<p class="hint">Uma empresa já cadastrada será ignorada nas próximas análises para reduzir repetição e chamadas à IA. O histórico fica neste computador, no banco SQLite local.</p>
+</section></main></body></html>
+"""
 
 
 def _open_browser() -> None:
