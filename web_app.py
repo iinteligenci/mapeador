@@ -64,9 +64,10 @@ button{border:0;border-radius:10px;padding:12px 18px;background:var(--blue);colo
     <option value="both" {% if profile == 'both' %}selected{% endif %}>Ambas as empresas</option>
    </select></div>
    <div style="grid-column:1/-1"><label for="offer">Personalizar a proposta (opcional)</label><input id="offer" name="offer" value="{{ offer }}" placeholder="Ex.: fornecimento de bacon, linguiça e carnes defumadas"></div>
+   <div style="grid-column:1/-1;display:flex;align-items:center;gap:10px"><input id="reanalyze" name="reanalyze" type="checkbox" value="yes" {% if reanalyze %}checked{% endif %} style="width:auto"><label for="reanalyze" style="margin:0">Reanalisar empresas já cadastradas para esta proposta</label></div>
   </div>
   <button id="submitButton" type="submit">⌕ Iniciar prospecção</button>
-  <div class="note">O Mapeador pula empresas já cadastradas. Na opção “Ambas”, a IA faz uma única chamada para avaliar os dois perfis. Mensagens são apenas rascunhos.</div>
+  <div class="note">Por padrão, empresas já analisadas são ignoradas. Marque a opção acima para gerar uma nova análise para a proposta selecionada. Na opção “Ambas”, a IA avalia os dois perfis em uma chamada. Mensagens são apenas rascunhos.</div>
  </form>
 </section>
 {% if error %}<div class="alert">{{ error }}</div>{% endif %}
@@ -138,7 +139,7 @@ document.getElementById('searchForm').addEventListener('submit', function(){
 def index():
     return render_template_string(
         PAGE, term="restaurantes em Vila Velha ES", limit=3,
-        offer="", profile="both", results=None, analyzed=0, failed=0, skipped=0, error=None
+        offer="", profile="both", reanalyze=False, results=None, analyzed=0, failed=0, skipped=0, error=None
     )
 
 
@@ -180,9 +181,9 @@ def search():
         except Exception:
             lead_id, inserted = None, True
 
-        # Skip completed leads; allow retry when the previous AI call failed.
+        # By default skip completed leads. A user can explicitly request a new offer/profile analysis.
         existing = saved_by_link.get(lead.get("link"))
-        if not inserted and existing and existing.get("score") is not None:
+        if not inserted and existing and existing.get("score") is not None and not reanalyze:
             skipped += 1
             continue
 
