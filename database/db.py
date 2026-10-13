@@ -181,8 +181,12 @@ def update_public_contacts(lead_id: int, contacts: dict[str, Any], path: str | N
         conn.execute(
             """UPDATE leads SET contact_name=?, contact_role=?, contact_phone=?,
                contact_whatsapp=?, contact_source=?, contact_confidence=?,
-               contact_notes=?, contact_checked_at=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP WHERE id=?""",
-            (*values, notes, lead_id),
+               contact_notes=?, contact_emails=?, contact_phones=?, contact_whatsapps=?,
+               contact_checked_at=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP WHERE id=?""",
+            (*values, notes,
+             ", ".join(contacts.get("contact_emails", [])),
+             ", ".join(contacts.get("contact_phones", [])),
+             ", ".join(contacts.get("contact_whatsapps", [])), lead_id),
         )
 
 
