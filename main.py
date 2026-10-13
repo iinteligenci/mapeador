@@ -123,9 +123,19 @@ async def run() -> int:
         ]:
             value = research.get(key) or lead.get(key)
             print(f"{label}: {_report_value(value)}")
+        analysis_lead = {
+            **lead,
+            "address": research.get("address") or lead.get("address", ""),
+            "instagram": research.get("instagram", ""),
+            "channels": research.get("channels", []),
+            "menu_url": research.get("menu_url", ""),
+            "menu_items": research.get("menu_items", []),
+            "public_platforms": research.get("public_platforms", []),
+            "research_notes": research.get("research_notes", []),
+        }
         analysis: dict = {}
         try:
-            analysis = analyze_lead(lead, args.oferta)
+            analysis = analyze_lead(analysis_lead, args.oferta)
             update_analysis(lead_id, analysis, db_path)
             print(f"Presença digital — prioridade estimada: {analysis['score']}/100")
             print(f"Análise: {analysis['justificativa']}")
