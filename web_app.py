@@ -286,7 +286,8 @@ def create_campaign():
     if profile not in {"4k", "digital"} or not message:
         return "Escolha uma empresa e escreva a mensagem antes de salvar.", 400
     db_path = os.getenv("DATABASE_PATH", "data/mapeador.sqlite3")
-    campaign_id = save_campaign(name, profile, message, db_path)
+    search_term = (request.form.get("search_term") or "").strip()
+    campaign_id = save_campaign(name, profile, message, db_path, search_term)
     leads = get_leads(path=db_path)
     eligible = [
         int(lead["id"]) for lead in leads
@@ -495,9 +496,10 @@ body{margin:0;background:#0b1220;color:#edf4ff;font:15px/1.5 Segoe UI,Arial}main
 <section class="panel"><h2>Nova campanha</h2><form method="post" action="/campaigns/create">
 <label>Nome da campanha</label><input name="name" placeholder="Ex.: Oferta de outubro">
 <label>Empresa</label><select name="profile"><option value="4k">4K Food Service</option><option value="digital">Presença Digital</option></select>
+<label>Termo para continuar prospectando (opcional)</label><input name="search_term" placeholder="Ex.: restaurantes em Vila Velha ES">
 <label>Mensagem que será usada no WhatsApp</label><textarea name="message" rows="6" required placeholder="Escreva e revise a mensagem antes de criar a campanha."></textarea>
 <button type="submit">Salvar mensagem e preparar lista</button></form><p class="muted">A lista inclui contatos públicos já cadastrados. Antes de contatar alguém, confirme que há base legal e autorização apropriada; respeite pedidos para não receber mensagens.</p></section>
-<section class="panel"><h2>Campanhas salvas</h2>{% for c in campaigns %}<div class="entry"><strong>{{c.name}}</strong> · {{'4K Food Service' if c.profile == '4k' else 'Presença Digital'}}<p class="muted">{{c.created_at}} · {{c.queued_count}} contatos na fila</p><a class="btn" href="/campaigns/{{c.id}}">Abrir campanha</a></div>{% else %}<p class="muted">Nenhuma campanha criada ainda.</p>{% endfor %}</section></main></body></html>
+<section class="panel"><h2>Campanhas salvas</h2>{% for c in campaigns %}<div class="entry"><strong>{{c.name}}</strong> · {{'4K Food Service' if c.profile == '4k' else 'Presença Digital'}}<p class="muted">{{c.created_at}} · {{c.queued_count}} contatos na fila{% if c.search_term %} · busca contínua: {{c.search_term}}{% endif %}</p><a class="btn" href="/campaigns/{{c.id}}">Abrir campanha</a></div>{% else %}<p class="muted">Nenhuma campanha criada ainda.</p>{% endfor %}</section></main></body></html>
 """
 
 CAMPAIGN_DETAIL_PAGE = r"""
@@ -517,6 +519,19 @@ def _background_research_loop() -> None:
         try:
             db_path = os.getenv("DATABASE_PATH", "data/mapeador.sqlite3")
             records = get_leads(path=db_path)
+            # If the latest campaign has a prospecting term, add newly discovered businesses to its review queue.
+            active_campaigns = get_campaigns(db_path)
+            active_campaign = next((item for item in active_campaigns if item.get("search_term")), None)
+            if active_campaign:
+                known_links = {str(item.get("link") or "").split("?")[0].rstrip("/") for item in records}
+                new_leads = asyncio.run(search_google_maps(active_campaign["search_term"], 3, exclude_links=known_links))
+                new_ids = []
+                for new_lead in new_leads:
+                    new_id, inserted = save_lead(new_lead, db_path)
+                    if inserted:
+                        new_ids.append(new_id)
+                if new_ids:
+                    queue_campaign(int(active_campaign["id"]), new_ids, db_path)
             cutoff = datetime.now() - timedelta(days=7)
             processed = 0
             for lead in records:
