@@ -72,6 +72,9 @@ Nunca publique o arquivo `.env` nem compartilhe a chave. O projeto usa o SDK atu
 - Os seletores do Google Maps podem mudar; telefone/endereço/site podem não estar disponíveis.
 - A coleta do Maps e a consulta de sites são experimentais. Não há tentativa de contornar CAPTCHA, login, bloqueios ou limites.
 - Para uso comercial contínuo, considere a Google Maps Platform Places API e siga seus termos e cotas.
+- O enriquecimento contínuo depende de a aplicação local permanecer aberta e de o estabelecimento ter um site público; examina até dois registros por ciclo de 30 minutos.
+- CNPJ só é preenchido quando aparece explicitamente em páginas públicas examinadas. Não é uma consulta oficial de situação cadastral.
+- A fila de campanhas prepara links wa.me com texto pré-preenchido; o envio é manual e requer revisão/autorizações adequadas. Não há disparo automático de mensagens.
 - A pesquisa de canais e ferramentas limita-se às páginas públicas examinadas; não confirma sistemas internos de gestão.
 - Itens do cardápio são extraídos de textos visíveis, não de imagens/PDFs; confirme no link de origem.
 - A qualificação por IA é uma hipótese para revisão humana. Mensagens comerciais ficam como rascunhos; nada é enviado automaticamente.
@@ -83,8 +86,10 @@ A interface roda no computador e separa a prospecção em duas etapas:
 
 1. **Buscar estabelecimentos:** digite a categoria/termo e a localidade (por exemplo, bares, restaurantes, açougues, padarias ou peixarias em uma cidade). A busca não chama a IA. Ela consulta resultados além dos que já estão no histórico e mostra apenas novos estabelecimentos.
 2. **Gerar proposta por estabelecimento:** no cartão do negócio, escolha 4K Food Service, Presença digital ou ambas, personalize a oferta se quiser e clique em “Gerar proposta”. A consulta complementar ao site e a chamada ao Gemini acontecem só nesse momento.
-3. **Encontrar responsável e contatos públicos:** em cada estabelecimento, clique em “Encontrar responsável e contatos públicos”. O Mapeador examina até seis páginas públicas do site da própria empresa à procura de nomes/cargos explicitamente publicados, telefone comercial e link de WhatsApp. O resultado é salvo no histórico com fonte e indicação de confiança. Não adivinha números nem atribui um telefone comercial ao dono sem evidência.
-4. **Estabelecimentos encontrados:** a aba guarda todos os negócios já descobertos e permite organizar a etapa comercial: para visitar, visitado ou cliente.
+3. **Campanhas:** abra “Campanhas”, escolha 4K Food Service ou Presença Digital e escreva a mensagem. A lista de contatos públicos fica preparada e cada conversa pode ser aberta no WhatsApp com o texto preenchido; o envio é manual, após confirmação de que há autorização apropriada. O sistema não dispara mensagens em massa nem envia sem revisão.
+4. **Pesquisa contínua:** enquanto `py web_app.py` estiver rodando, um processo local revisa até dois cadastros por ciclo (a cada 30 minutos) que tenham site, procurando contatos comerciais e CNPJ explicitamente publicados. O processo respeita limites modestos, não contorna bloqueios e não garante que toda empresa publique esses dados.
+5. **Encontrar responsável e contatos públicos:** em cada estabelecimento, clique em “Encontrar responsável e contatos públicos”. O Mapeador examina até seis páginas públicas do site da própria empresa à procura de nomes/cargos explicitamente publicados, telefone comercial e link de WhatsApp. O resultado é salvo no histórico com fonte e indicação de confiança. Não adivinha números nem atribui um telefone comercial ao dono sem evidência.
+6. **Estabelecimentos encontrados:** a aba guarda todos os negócios já descobertos e permite organizar a etapa comercial: para visitar, visitado ou cliente.
 
 Para iniciar no Windows, atualize com GitHub Desktop (Fetch origin e Pull origin), instale as dependências com `py -m pip install -r requirements.txt` e execute `py web_app.py`. Abra `http://127.0.0.1:5000`. O banco SQLite fica em `data/`; não o apague ao atualizar o código.
 
