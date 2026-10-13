@@ -104,7 +104,7 @@ def find_public_business_contacts(lead: dict[str, Any], max_pages: int = MAX_PAG
             if role_match:
                 role_candidates.append((name, _clean(role_match.group(1)), response.url))
 
-        for match in re.finditer(r"(?i)\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}\\b", text):
+        for match in re.finditer(r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", text):
             email = match.group(0).strip(".,;:")
             emails.append((email, response.url))
 
