@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: mapeador
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt && playwright install chromium
+    startCommand: python web_app.py
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: DATABASE_PATH
+        value: /var/data/mapeador.sqlite3
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: MAPEADOR_PASSWORD
+        sync: false
+    disk:
+      name: mapeador-data
+      mountPath: /var/data
+      sizeGB: 1
