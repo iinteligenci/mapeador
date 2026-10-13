@@ -39,15 +39,18 @@ def research_public_site(lead: dict[str, Any], max_pages: int = 5) -> dict[str, 
         "address": str(lead.get("address") or ""),
         "instagram": "",
         "channels": [],
-        "menu_url": "",
+        "menu_url": str(lead.get("menu_url") or ""),
         "menu_items": [],
         "public_platforms": [],
         "research_notes": [],
         "sources": [],
     }
     base = str(lead.get("website") or "").strip()
+    maps_menu = str(lead.get("menu_url") or "").strip()
     if not base.startswith(("http://", "https://")):
-        result["research_notes"].append("Site próprio não localizado; não foi possível analisar páginas do estabelecimento.")
+        base = maps_menu
+    if not base.startswith(("http://", "https://")):
+        result["research_notes"].append("Site próprio ou link público de cardápio não localizado; pesquisa complementar limitada.")
         return result
 
     try:
@@ -62,11 +65,13 @@ def research_public_site(lead: dict[str, Any], max_pages: int = 5) -> dict[str, 
 
     root_host = urlparse(first.url).netloc.lower().removeprefix("www.")
     queue = [first.url]
+    if maps_menu.startswith(("http://", "https://")) and maps_menu != first.url:
+        queue.append(maps_menu)
     visited: set[str] = set()
     channel_set: set[str] = set()
     platforms: set[str] = set()
     menu_items: list[str] = []
-    menu_url = ""
+    menu_url = maps_menu
     all_text: list[str] = []
 
     while queue and len(visited) < max(1, min(max_pages, 8)):
