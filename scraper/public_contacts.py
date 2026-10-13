@@ -37,8 +37,14 @@ def find_public_business_contacts(lead: dict[str, Any], max_pages: int = MAX_PAG
     }
     base = str(lead.get("website") or "").strip()
     if not base.startswith(("https://", "http://")):
+        # Preserve a publicly listed Maps business phone, but never label it as a person's direct number.
+        maps_phone = _clean(str(lead.get("phone") or ""))
+        if maps_phone:
+            result["contact_phone"] = maps_phone
+            result["contact_source"] = str(lead.get("link") or "")
+            result["contact_confidence"] = "Telefone comercial listado no Google Maps"
         result["contact_notes"].append(
-            "Site próprio não identificado. Não foi feita busca de números pessoais nem inferência de decisores."
+            "Site próprio não identificado. Nenhum contato direto de decisor foi atribuído; o telefone, se exibido, é apenas o contato comercial público do estabelecimento."
         )
         return result
 
