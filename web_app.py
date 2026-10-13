@@ -58,16 +58,10 @@ button{border:0;border-radius:10px;padding:12px 18px;background:var(--blue);colo
   <div class="formgrid">
    <div><label for="term">Tipo de negócio e localidade</label><input id="term" name="term" value="{{ term }}" required placeholder="Ex.: bares em Vila Velha ES"></div>
    <div><label for="limit">Quantidade máxima</label><select id="limit" name="limit">{% for n in [3,5,10,15] %}<option value="{{n}}" {% if limit == n %}selected{% endif %}>{{n}} negócios</option>{% endfor %}</select></div>
-   <div><label for="profile">Qual empresa vai prospectar?</label><select id="profile" name="profile">
-    <option value="4k" {% if profile == '4k' %}selected{% endif %}>4K Food Service</option>
-    <option value="digital" {% if profile == 'digital' %}selected{% endif %}>Presença digital</option>
-    <option value="both" {% if profile == 'both' %}selected{% endif %}>Ambas as empresas</option>
-   </select></div>
-   <div style="grid-column:1/-1"><label for="offer">Personalizar a proposta (opcional)</label><input id="offer" name="offer" value="{{ offer }}" placeholder="Ex.: fornecimento de bacon, linguiça e carnes defumadas"></div>
-   <div style="grid-column:1/-1;display:flex;align-items:center;gap:10px"><input id="reanalyze" name="reanalyze" type="checkbox" value="yes" {% if reanalyze %}checked{% endif %} style="width:auto"><label for="reanalyze" style="margin:0">Reanalisar empresas já cadastradas para esta proposta</label></div>
+
   </div>
   <button id="submitButton" type="submit">⌕ Iniciar prospecção</button>
-  <div class="note">Pesquisar não chama a IA. Os dados básicos aparecem primeiro; use “Gerar proposta” em cada estabelecimento quando quiser uma análise comercial. A pesquisa pública complementar e a IA só rodam nessa etapa.</div>
+  <div class="note">Esta etapa só encontra e salva estabelecimentos. Para cada empresa, escolha 4K Food Service, presença digital ou ambas e gere uma proposta quando quiser.</div>
  </form>
 </section>
 {% if error %}<div class="alert">{{ error }}</div>{% endif %}
@@ -159,12 +153,9 @@ def index():
 @app.post("/search")
 def search():
     term = (request.form.get("term") or "").strip()
-    offer = (request.form.get("offer") or "").strip()
-    profile = (request.form.get("profile") or "both").strip()
-    if profile not in {"4k", "digital", "both"}:
-        profile = "both"
-    selected_profiles = ["4k", "digital"] if profile == "both" else [profile]
-    reanalyze = request.form.get("reanalyze") == "yes"
+    offer = ""
+    profile = "both"
+    reanalyze = False
     try:
         limit = max(1, min(15, int(request.form.get("limit", "3"))))
     except ValueError:
