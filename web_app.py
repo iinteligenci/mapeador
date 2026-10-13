@@ -11,7 +11,7 @@ from typing import Any
 from dotenv import load_dotenv
 from flask import Flask, redirect, render_template_string, request, url_for
 
-from ai_agent.analyzer import analyze_lead
+from ai_agent.analyzer import analyze_lead_profiles
 from database.db import get_leads, init_db, save_lead, update_analysis, update_lead_status
 from scraper.maps_scraper import search_google_maps
 from scraper.site_research import research_public_site
@@ -54,12 +54,17 @@ button{border:0;border-radius:10px;padding:12px 18px;background:var(--blue);colo
  <h2>Nova prospecção</h2>
  <form id="searchForm" method="post" action="/search">
   <div class="formgrid">
-   <div><label for="term">O que pesquisar e onde?</label><input id="term" name="term" value="{{ term }}" required placeholder="Ex.: restaurantes em Vila Velha ES"></div>
+   <div><label for="term">Tipo de negócio e localidade</label><input id="term" name="term" value="{{ term }}" required placeholder="Ex.: bares em Vila Velha ES"></div>
    <div><label for="limit">Quantidade máxima</label><select id="limit" name="limit">{% for n in [3,5,10,15] %}<option value="{{n}}" {% if limit == n %}selected{% endif %}>{{n}} negócios</option>{% endfor %}</select></div>
-   <div><label for="offer">Sua oferta comercial</label><input id="offer" name="offer" value="{{ offer }}" required placeholder="Serviços de presença digital"></div>
+   <div><label for="profile">Qual empresa vai prospectar?</label><select id="profile" name="profile">
+    <option value="4k" {% if profile == '4k' %}selected{% endif %}>4K Food Service</option>
+    <option value="digital" {% if profile == 'digital' %}selected{% endif %}>Presença digital</option>
+    <option value="both" {% if profile == 'both' %}selected{% endif %}>Ambas as empresas</option>
+   </select></div>
+   <div style="grid-column:1/-1"><label for="offer">Personalizar a proposta (opcional)</label><input id="offer" name="offer" value="{{ offer }}" placeholder="Ex.: fornecimento de bacon, linguiça e carnes defumadas"></div>
   </div>
   <button id="submitButton" type="submit">⌕ Iniciar prospecção</button>
-  <div class="note">A pesquisa pode levar alguns minutos. Mensagens são apenas rascunhos; nada é enviado automaticamente.</div>
+  <div class="note">O Mapeador pula empresas já cadastradas. Na opção “Ambas”, a IA faz uma única chamada para avaliar os dois perfis. Mensagens são apenas rascunhos.</div>
  </form>
 </section>
 {% if error %}<div class="alert">{{ error }}</div>{% endif %}
@@ -88,10 +93,12 @@ button{border:0;border-radius:10px;padding:12px 18px;background:var(--blue);colo
     <div class="detail"><b>Itens em páginas públicas</b><div>{{ research.menu_items[:12]|join(", ") if research.menu_items else "Não identificado publicamente" }}</div></div>
     <div class="detail"><b>Plataformas encontradas publicamente</b><div>{{ research.public_platforms|join(", ") if research.public_platforms else "Não identificado publicamente" }}</div></div>
    </div>
-   {% if analysis %}
-   <div class="analysis"><b>Leitura comercial preliminar</b><p>{{ analysis.justificativa }}</p>
+   {% if item.analyses %}
+   {% for profile_key, analysis in item.analyses.items() %}
+   <div class="analysis"><b>{{ "4K Food Service" if profile_key == "4k" else "Presença digital" }} · prioridade {{ analysis.score }}/100</b><p>{{ analysis.justificativa }}</p>
     <div class="draft"><b>Rascunho de abordagem — não enviado</b>
 {{ analysis.mensagem }}</div></div>
+   {% endfor %}
    {% else %}
    <div class="alert" style="margin-top:14px">{{ item.error or "Análise de IA não concluída. Os dados públicos coletados continuam disponíveis." }}</div>
    {% endif %}
@@ -128,21 +135,25 @@ document.getElementById('searchForm').addEventListener('submit', function(){
 def index():
     return render_template_string(
         PAGE, term="restaurantes em Vila Velha ES", limit=3,
-        offer="serviços de presença digital", results=None, analyzed=0, failed=0, skipped=0, error=None
+        offer="", profile="both", results=None, analyzed=0, failed=0, skipped=0, error=None
     )
 
 
 @app.post("/search")
 def search():
     term = (request.form.get("term") or "").strip()
-    offer = (request.form.get("offer") or "serviços de presença digital").strip()
+    offer = (request.form.get("offer") or "").strip()
+    profile = (request.form.get("profile") or "both").strip()
+    if profile not in {"4k", "digital", "both"}:
+        profile = "both"
+    selected_profiles = ["4k", "digital"] if profile == "both" else [profile]
     try:
         limit = max(1, min(15, int(request.form.get("limit", "3"))))
     except ValueError:
         limit = 3
     if not term:
         return render_template_string(
-            PAGE, term=term, limit=limit, offer=offer, results=None,
+            PAGE, term=term, limit=limit, offer=offer, profile=profile, results=None,
             analyzed=0, failed=0, skipped=0, error="Informe o que pesquisar e a localidade."
         ), 400
 
@@ -152,7 +163,7 @@ def search():
         leads = asyncio.run(search_google_maps(term, limit))
     except Exception as exc:
         return render_template_string(
-            PAGE, term=term, limit=limit, offer=offer, results=[],
+            PAGE, term=term, limit=limit, offer=offer, profile=profile, results=[],
             analyzed=0, failed=0, skipped=0, error=f"Falha na pesquisa do Maps: {type(exc).__name__}: {exc}"
         ), 500
 
@@ -190,19 +201,30 @@ def search():
             "public_platforms": research.get("public_platforms", []),
             "research_notes": research.get("research_notes", []),
         }
-        analysis = None
+        analyses = None
         error = None
         try:
-            analysis = analyze_lead(analysis_lead, offer)
+            analyses = analyze_lead_profiles(analysis_lead, selected_profiles, offer)
             analyzed += 1
             if lead_id is not None:
-                update_analysis(lead_id, analysis, db_path)
+                combined = {
+                    "score": max(item["score"] for item in analyses.values()),
+                    "justificativa": "\\n".join(
+                        f"{'4K Food Service' if key == '4k' else 'Presença digital'}: {item['justificativa']}"
+                        for key, item in analyses.items()
+                    ),
+                    "mensagem": "\\n\\n".join(
+                        f"{'4K Food Service' if key == '4k' else 'Presença digital'} — rascunho não enviado:\\n{item['mensagem']}"
+                        for key, item in analyses.items()
+                    ),
+                }
+                update_analysis(lead_id, combined, db_path)
         except Exception as exc:
             error = f"IA não concluiu ({type(exc).__name__}). Os dados coletados foram mantidos."
-        results.append({"lead": lead, "lead_id": lead_id, "research": research, "analysis": analysis, "error": error})
+        results.append({"lead": lead, "lead_id": lead_id, "research": research, "analyses": analyses, "error": error})
 
     return render_template_string(
-        PAGE, term=term, limit=limit, offer=offer, results=results,
+        PAGE, term=term, limit=limit, offer=offer, profile=profile, results=results,
         analyzed=analyzed, failed=len(results) - analyzed, skipped=skipped, error=None
     )
 
