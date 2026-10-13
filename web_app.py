@@ -151,13 +151,14 @@ def search():
     if profile not in {"4k", "digital", "both"}:
         profile = "both"
     selected_profiles = ["4k", "digital"] if profile == "both" else [profile]
+    reanalyze = request.form.get("reanalyze") == "yes"
     try:
         limit = max(1, min(15, int(request.form.get("limit", "3"))))
     except ValueError:
         limit = 3
     if not term:
         return render_template_string(
-            PAGE, term=term, limit=limit, offer=offer, profile=profile, results=None,
+            PAGE, term=term, limit=limit, offer=offer, profile=profile, reanalyze=reanalyze, results=None,
             analyzed=0, failed=0, skipped=0, error="Informe o que pesquisar e a localidade."
         ), 400
 
@@ -167,7 +168,7 @@ def search():
         leads = asyncio.run(search_google_maps(term, limit))
     except Exception as exc:
         return render_template_string(
-            PAGE, term=term, limit=limit, offer=offer, profile=profile, results=[],
+            PAGE, term=term, limit=limit, offer=offer, profile=profile, reanalyze=reanalyze, results=[],
             analyzed=0, failed=0, skipped=0, error=f"Falha na pesquisa do Maps: {type(exc).__name__}: {exc}"
         ), 500
 
@@ -230,7 +231,7 @@ def search():
         results.append({"lead": lead, "lead_id": lead_id, "research": research, "analyses": analyses, "error": error})
 
     return render_template_string(
-        PAGE, term=term, limit=limit, offer=offer, profile=profile, results=results,
+        PAGE, term=term, limit=limit, offer=offer, profile=profile, reanalyze=reanalyze, results=results,
         analyzed=analyzed, failed=len(results) - analyzed, skipped=skipped, error=None
     )
 
