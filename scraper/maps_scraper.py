@@ -20,7 +20,7 @@ def _clean(value: str | None) -> str:
     return re.sub(r"\s+", " ", value or "").strip()
 
 
-async def search_google_maps(term: str, limit: int = 10) -> list[dict[str, str]]:
+async def search_google_maps(term: str, limit: int = 10, exclude_links: set[str] | None = None) -> list[dict[str, str]]:
     """Retorna leads com nome, categoria, link, telefone, endereço e site quando disponíveis."""
     term = _clean(term)
     if not term:
@@ -29,6 +29,9 @@ async def search_google_maps(term: str, limit: int = 10) -> list[dict[str, str]]
         raise ValueError("O limite deve ser maior que zero.")
 
     results: list[dict[str, str]] = []
+    excluded = {str(link).split("?")[0].rstrip("/") for link in (exclude_links or set()) if link}
+    # Read extra cards so duplicates in the local history do not consume the requested result count.
+    scan_limit = min(60, max(limit * 5, limit + 10))
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         context = await browser.new_context(locale="pt-BR", viewport={"width": 1365, "height": 900})
@@ -44,9 +47,9 @@ async def search_google_maps(term: str, limit: int = 10) -> list[dict[str, str]]
                 return []
 
             previous = -1
-            for _ in range(min(20, max(4, limit * 2))):
+            for _ in range(min(30, max(6, scan_limit // 2))):
                 count = await feed.locator('div[role="article"]').count()
-                if count >= limit or count == previous:
+                if count >= scan_limit or count == previous:
                     break
                 previous = count
                 await feed.evaluate("(el) => el.scrollBy(0, el.clientHeight)")
@@ -56,7 +59,7 @@ async def search_google_maps(term: str, limit: int = 10) -> list[dict[str, str]]
             candidates: list[dict[str, str]] = []
             seen: set[str] = set()
             for card in cards:
-                if len(candidates) >= limit:
+                if len(candidates) >= scan_limit:
                     break
                 try:
                     anchor = card.locator('a[href*="/maps/place/"]').first
@@ -69,9 +72,10 @@ async def search_google_maps(term: str, limit: int = 10) -> list[dict[str, str]]
                         continue
                     if link.startswith("/"):
                         link = "https://www.google.com" + link
-                    if link in seen:
+                    normalized_link = link.split("?")[0].rstrip("/")
+                    if normalized_link in seen or normalized_link in excluded:
                         continue
-                    seen.add(link)
+                    seen.add(normalized_link)
                     category = ""
                     for line in lines[1:]:
                         low = line.lower()
@@ -88,7 +92,8 @@ async def search_google_maps(term: str, limit: int = 10) -> list[dict[str, str]]
                 except Exception as exc:
                     logger.debug("Cartão ignorado: %s", exc)
 
-            for lead in candidates:
+            # Visit detail pages only for genuinely new establishments, keeping search faster.
+            for lead in candidates[:limit]:
                 try:
                     await page.goto(lead["link"], wait_until="domcontentloaded", timeout=18000)
                     for selector, field in [
