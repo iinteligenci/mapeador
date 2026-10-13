@@ -12,8 +12,9 @@ from dotenv import load_dotenv
 from flask import Flask, redirect, render_template_string, request, url_for
 
 from ai_agent.analyzer import analyze_lead_profiles
-from database.db import get_leads, init_db, save_lead, update_analysis, update_lead_status
+from database.db import get_leads, init_db, save_lead, update_analysis, update_lead_status, update_public_contacts
 from scraper.maps_scraper import search_google_maps
+from scraper.public_contacts import find_public_business_contacts
 from scraper.site_research import research_public_site
 
 load_dotenv()
@@ -95,6 +96,24 @@ button{border:0;border-radius:10px;padding:12px 18px;background:var(--blue);colo
    {% elif item.error %}
    <div class="alert" style="margin-top:14px">{{ item.error }}</div>
    {% endif %}
+   {% if item.contacts %}
+   <div class="analysis"><b>Contato comercial público</b>
+    <p><strong>Responsável:</strong> {{ item.contacts.contact_name or "Não identificado publicamente" }}</p>
+    <p><strong>Cargo:</strong> {{ item.contacts.contact_role or "Não identificado publicamente" }}</p>
+    <p><strong>Telefone:</strong> {{ item.contacts.contact_phone or "Não identificado publicamente" }}</p>
+    <p><strong>WhatsApp:</strong> {{ item.contacts.contact_whatsapp or "Não identificado publicamente" }}</p>
+    <p><strong>Confirmação:</strong> {{ item.contacts.contact_confidence or "Não identificado" }}</p>
+    {% if item.contacts.contact_source %}<p><strong>Fonte:</strong> <a href="{{ item.contacts.contact_source }}" target="_blank" rel="noopener">Ver página de origem</a></p>{% endif %}
+    {% for note in item.contacts.contact_notes %}<p class="note">{{ note }}</p>{% endfor %}
+   </div>
+   {% endif %}
+   <form class="statusform" method="post" action="/contacts">
+    <input type="hidden" name="lead_id" value="{{ item.lead_id }}">
+    <input type="hidden" name="term" value="{{ term }}">
+    <input type="hidden" name="limit" value="{{ limit }}">
+    <input type="hidden" name="source" value="search">
+    <button type="submit">Encontrar responsável e contatos públicos</button>
+   </form>
    <form class="statusform" method="post" action="/proposal">
     <input type="hidden" name="lead_id" value="{{ item.lead_id }}">
     <input type="hidden" name="term" value="{{ term }}">
@@ -205,6 +224,50 @@ def search():
     return render_template_string(
         PAGE, term=term, limit=limit, offer=offer, profile=profile, reanalyze=reanalyze, results=results,
         analyzed=0, failed=0, skipped=skipped, error=None
+    )
+
+
+@app.post("/contacts")
+def enrich_public_contacts():
+    db_path = os.getenv("DATABASE_PATH", "data/mapeador.sqlite3")
+    try:
+        lead_id = int(request.form.get("lead_id", ""))
+    except (ValueError, TypeError):
+        return "Estabelecimento inválido.", 400
+    saved = next((item for item in get_leads(path=db_path) if item.get("id") == lead_id), None)
+    if not saved:
+        return "Estabelecimento não encontrado no histórico.", 404
+
+    contacts = find_public_business_contacts(saved)
+    update_public_contacts(lead_id, contacts, db_path)
+    source = (request.form.get("source") or "history").strip()
+    if source == "history":
+        return redirect(url_for("history"))
+
+    lead = {
+        "name": saved.get("name", ""),
+        "category": saved.get("category", ""),
+        "link": saved.get("link", ""),
+        "phone": saved.get("phone", ""),
+        "address": "",
+        "website": saved.get("website", ""),
+    }
+    research = {
+        "address": "", "instagram": "", "channels": [], "menu_url": "",
+        "menu_items": [], "public_platforms": [], "research_notes": [], "sources": [],
+    }
+    item = {
+        "lead": lead, "lead_id": lead_id, "research": research,
+        "analyses": None, "error": None, "contacts": contacts,
+    }
+    try:
+        page_limit = max(1, min(15, int(request.form.get("limit", "3") or "3")))
+    except ValueError:
+        page_limit = 3
+    return render_template_string(
+        PAGE, term=request.form.get("term", "restaurantes em Vila Velha ES"),
+        limit=page_limit, offer="", profile="both", reanalyze=False, results=[item],
+        analyzed=0, failed=0, skipped=0, error=None
     )
 
 
@@ -337,7 +400,12 @@ main{max-width:1180px;margin:auto;padding:34px 22px 64px}.brand{display:flex;gap
 {% for lead in leads %}<article class="entry">
 <div class="top"><div><h3>{{ lead.name }}</h3><div class="muted">{{ lead.category or "Categoria não identificada" }}</div></div><span class="pill">{{ lead.status_label }}</span></div>
 <div class="meta">
-<div><b>Telefone</b>{{ lead.phone or "Não identificado publicamente" }}</div>
+<div><b>Telefone comercial</b>{{ lead.phone or "Não identificado publicamente" }}</div>
+<div><b>Responsável público</b>{{ lead.contact_name or "Não identificado publicamente" }}{% if lead.contact_role %} · {{ lead.contact_role }}{% endif %}</div>
+<div><b>Telefone do contato publicado</b>{{ lead.contact_phone or "Não identificado publicamente" }}</div>
+<div><b>WhatsApp comercial</b>{{ lead.contact_whatsapp or "Não identificado publicamente" }}</div>
+<div><b>Fonte do contato</b>{% if lead.contact_source %}<a href="{{lead.contact_source}}" target="_blank" rel="noopener">Ver página de origem</a>{% else %}Não identificado publicamente{% endif %}</div>
+<div><b>Confiança da identificação</b>{{ lead.contact_confidence or "Não identificado" }}</div>
 <div><b>Site</b>{% if lead.website %}<a href="{{lead.website}}" target="_blank" rel="noopener">{{lead.website}}</a>{% else %}Não identificado publicamente{% endif %}</div>
 <div><b>Prioridade preliminar</b>{{ (lead.score|string + "/100") if lead.score is not none else "Ainda não avaliada" }}</div>
 <div><b>Última atualização</b>{{ lead.updated_at }}</div>
@@ -345,6 +413,9 @@ main{max-width:1180px;margin:auto;padding:34px 22px 64px}.brand{display:flex;gap
 </div>
 {% if lead.message %}<details><summary>Ver última proposta gerada (não enviada)</summary><p style="white-space:pre-wrap">{{ lead.message }}</p></details>{% endif %}
 {% if lead.link %}<p><a href="{{lead.link}}" target="_blank" rel="noopener">Abrir no Google Maps ↗</a></p>{% endif %}
+<form class="statusform" method="post" action="/contacts">
+<input type="hidden" name="lead_id" value="{{lead.id}}"><input type="hidden" name="source" value="history">
+<button type="submit">Encontrar responsável e contatos públicos</button></form>
 <form class="statusform" method="post" action="/proposal">
 <input type="hidden" name="lead_id" value="{{lead.id}}"><input type="hidden" name="term" value="Estabelecimento do histórico"><input type="hidden" name="limit" value="3">
 <label for="history-proposal-{{lead.id}}" class="muted">Gerar proposta para:</label>
