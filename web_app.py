@@ -11,7 +11,7 @@ from urllib.parse import quote
 from typing import Any
 
 from dotenv import load_dotenv
-from flask import Flask, redirect, render_template_string, request, url_for
+from flask import Flask, redirect, render_template_string, request, url_for, abort
 
 from ai_agent.analyzer import analyze_lead_profiles
 from ai_agent.research_planner import plan_deep_searches
@@ -24,6 +24,26 @@ from scraper.site_research import research_public_site
 load_dotenv()
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 1 * 1024 * 1024
+
+@app.before_request
+def require_hosted_password():
+    """Protege a aplicação publicada; local continua acessível sem login."""
+    if request.path == "/health":
+        return None
+    if os.getenv("RENDER") != "true":
+        return None
+    expected = os.getenv("MAPEADOR_PASSWORD", "")
+    if not expected:
+        abort(503, "Configure MAPEADOR_PASSWORD nas variáveis de ambiente do serviço.")
+    from secrets import compare_digest
+    supplied = request.authorization
+    if not supplied or not compare_digest(supplied.username or "", "mapeador") or not compare_digest(supplied.password or "", expected):
+        return ("Autenticação necessária", 401, {"WWW-Authenticate": 'Basic realm="Mapeador"'})
+    return None
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
 
 PAGE = r"""
 <!doctype html>
@@ -756,5 +776,6 @@ def _open_browser() -> None:
 if __name__ == "__main__":
     init_db()
     threading.Thread(target=_background_research_loop, daemon=True, name="mapeador-public-research").start()
-    threading.Timer(1.0, _open_browser).start()
-    app.run(host="127.0.0.1", port=int(os.getenv("PORT", "5000")), debug=False)
+    if os.getenv("RENDER") != "true":
+        threading.Timer(1.0, _open_browser).start()
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", "5000")), debug=False)
