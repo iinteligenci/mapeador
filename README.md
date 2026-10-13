@@ -1,22 +1,23 @@
-# Mapeador — Agente de Prospecção com Google Maps e IA
+# Mapeador — pesquisa de negócios alimentícios
 
-Aplicação Python que tenta coletar dados comerciais públicos, evita duplicados em SQLite e usa Gemini para sugerir uma qualificação e uma mensagem B2B. O módulo de contato **apenas exibe rascunhos**: não envia WhatsApp, e-mail ou SMS.
+O Mapeador pesquisa estabelecimentos do setor alimentício no Google Maps, reúne informações comerciais públicas e gera um relatório para avaliar oportunidades para a 4K Food Service e para a empresa de presença digital. Não cruza nem precisa do catálogo da 4K.
 
-## Estrutura
+## O relatório mostra
 
-- `scraper/maps_scraper.py`: busca no Google Maps com Playwright; tenta extrair nome, categoria, telefone e site.
-- `database/db.py`: banco SQLite local e deduplicação por link do local.
-- `ai_agent/analyzer.py`: qualificação estimada e mensagem com Gemini.
-- `outreach/sender.py`: exibe rascunhos para revisão humana.
-- `main.py`: conecta os módulos.
-- `data/mapeador.sqlite3`: criado automaticamente na primeira execução.
+- Nome, categoria, telefone, endereço, site e link do Google Maps, quando disponíveis.
+- Instagram e outros canais digitais encontrados em links públicos.
+- Link de cardápio/catálogo, quando identificado.
+- Itens ou produtos que aparecem como texto em páginas públicas do cardápio/site.
+- Plataformas e ferramentas digitais identificadas publicamente, como canais de pedidos, delivery e algumas plataformas de gestão.
+- Uma avaliação preliminar de adequação à oferta de presença digital.
+- Fontes consultadas e limitações da pesquisa.
 
-## Instalação para iniciantes (Windows)
+**Importante:** a pesquisa só informa o que consegue observar publicamente. Se um sistema de gestão de vendas não aparece no site ou em outra fonte pública examinada, o relatório diz que não foi identificado — não afirma que a empresa não usa. Cardápios em imagens, PDFs ou conteúdo carregado por JavaScript podem não ser lidos corretamente.
 
-1. Instale Python 3.11 ou 3.12 a partir do site oficial do Python. Durante a instalação, marque **Add Python to PATH**.
-2. Instale Git, caso ainda não tenha.
-3. Abra o PowerShell (menu Iniciar → escreva PowerShell).
-4. Copie e execute, uma linha de cada vez:
+## Instalação — Windows
+
+1. Instale Python 3.11 ou 3.12 e Git.
+2. Abra o PowerShell e execute, uma linha de cada vez:
 
 ```powershell
 git clone https://github.com/iinteligenci/mapeador.git
@@ -29,24 +30,16 @@ python -m playwright install chromium
 Copy-Item .env.example .env
 ```
 
-5. Abra a pasta `mapeador` no Explorador de Arquivos. Abra o arquivo `.env` com o Bloco de Notas e substitua `cole_sua_chave_aqui` pela sua chave real do Gemini. Salve.
-6. No PowerShell, execute:
+3. Abra o arquivo `.env` e configure sua chave do Gemini.
+4. Execute, por exemplo:
 
 ```powershell
-python main.py --termo "restaurantes em Vila Velha ES" --limite 5 --oferta "serviços de presença digital"
+python main.py --termo "restaurantes em Vila Velha ES" --limite 10
 ```
 
-Na primeira execução, o programa cria a pasta `data` e o banco SQLite. O resultado aparece no terminal. Mensagens são rascunhos e exigem revisão humana.
+O relatório será salvo em `reports/` no formato Markdown.
 
-### Se o PowerShell bloquear a ativação do ambiente
-
-Pode executar diretamente sem ativar o ambiente, usando:
-
-```powershell
-.venv\Scripts\python.exe -m pip install -r requirements.txt
-.venv\Scripts\python.exe -m playwright install chromium
-.venv\Scripts\python.exe main.py --termo "restaurantes em Vila Velha ES" --limite 5
-```
+Se a ativação do ambiente for bloqueada, use `.venv\Scripts\python.exe` no lugar de `python`.
 
 ## macOS/Linux
 
@@ -55,12 +48,11 @@ git clone https://github.com/iinteligenci/mapeador.git
 cd mapeador
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install --upgrade pip
 pip install -r requirements.txt
 python -m playwright install chromium
 cp .env.example .env
-# Edite .env e configure GEMINI_API_KEY
-python main.py --termo "restaurantes em Vila Velha ES" --limite 5
+# Configure GEMINI_API_KEY no .env
+python main.py --termo "restaurantes em Vila Velha ES" --limite 10
 ```
 
 ## Configuração
@@ -73,21 +65,14 @@ GEMINI_MODEL=gemini-2.0-flash
 DATABASE_PATH=data/mapeador.sqlite3
 ```
 
-Obtenha a chave no Google AI Studio. **Não publique `.env` nem compartilhe a chave.** O repositório inclui apenas `.env.example`.
-
-## Banco de dados
-
-Cada lead é identificado principalmente pelo link do local no Maps. Ao reencontrar o mesmo link, o banco atualiza campos disponíveis sem criar uma segunda linha. A análise mais recente e o rascunho também ficam associados ao registro.
+Nunca publique o arquivo `.env` nem compartilhe a chave.
 
 ## Limitações e uso responsável
 
-- Os seletores do Google Maps podem mudar; telefone/site podem não estar disponíveis e os resultados podem ficar incompletos.
-- Não há tentativa de contornar CAPTCHA, login, bloqueios ou limites. Para uso comercial contínuo, avalie a Google Maps Platform Places API e siga os seus termos e cotas.
-- O score é uma estimativa gerada por IA com base nos poucos dados coletados, não uma verificação objetiva da qualidade da empresa.
-- Revise a mensagem antes de entrar em contato. Respeite privacidade, LGPD, regras de contato comercial e pedidos de não contato. Não há disparo automático neste projeto.
-
-## Diagnóstico
-
-- `GEMINI_API_KEY` ausente: verifique se criou e editou o arquivo `.env` na pasta `mapeador`.
-- Chromium ausente: execute `python -m playwright install chromium`.
-- Nenhum resultado: teste outro termo, rode com `--verbose` e considere mudanças na página do Maps.
+- Os seletores do Google Maps podem mudar; telefone/endereço/site podem não estar disponíveis.
+- O site é consultado apenas em páginas públicas, sem login ou tentativa de contornar CAPTCHA, bloqueios ou limites.
+- Para uso comercial contínuo, considere a Google Maps Platform Places API e siga seus termos e cotas.
+- Itens do cardápio são extraídos de textos visíveis, não de imagens/PDFs; confirme no link de origem.
+- A existência de ferramenta interna de gestão de vendas só pode ser confirmada se houver evidência pública. Ausência de evidência não é prova de ausência.
+- A qualificação por IA é uma hipótese para revisão humana. Mensagens comerciais ficam como rascunhos; nada é enviado automaticamente.
+- Respeite a LGPD, os termos das plataformas e pedidos para não receber contato.
