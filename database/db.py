@@ -1,11 +1,11 @@
 """Persistência SQLite para leads e histórico da última análise."""
 from __future__ import annotations
 
-import json
 import os
 import sqlite3
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 
 def _db_path(path: str | None = None) -> Path:
@@ -21,9 +21,20 @@ def _connect(path: str | None = None) -> sqlite3.Connection:
     return conn
 
 
+@contextmanager
+def _connection(path: str | None = None) -> Iterator[sqlite3.Connection]:
+    """Abre uma conexão, faz commit/rollback e fecha o recurso ao sair."""
+    conn = _connect(path)
+    try:
+        with conn:
+            yield conn
+    finally:
+        conn.close()
+
+
 def init_db(path: str | None = None) -> None:
     """Cria as tabelas caso ainda não existam."""
-    with _connect(path) as conn:
+    with _connection(path) as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS leads (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
