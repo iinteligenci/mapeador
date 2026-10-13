@@ -31,7 +31,7 @@ async def search_google_maps(term: str, limit: int = 10, exclude_links: set[str]
     results: list[dict[str, str]] = []
     excluded = {str(link).split("?")[0].rstrip("/") for link in (exclude_links or set()) if link}
     # Read extra cards so duplicates in the local history do not consume the requested result count.
-    scan_limit = min(60, max(limit * 5, limit + 10))
+    scan_limit = min(60, max(limit * 5, limit + 10, len(excluded) + limit))
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         context = await browser.new_context(locale="pt-BR", viewport={"width": 1365, "height": 900})
