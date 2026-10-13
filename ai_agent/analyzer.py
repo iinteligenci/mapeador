@@ -1,4 +1,4 @@
-"""Qualificação de leads e rascunho comercial usando Gemini."""
+"""Qualificação de leads e rascunho comercial usando o SDK atual do Gemini."""
 from __future__ import annotations
 
 import json
@@ -6,7 +6,7 @@ import os
 import re
 from typing import Any
 
-import google.generativeai as genai
+from google import genai
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -17,8 +17,9 @@ def analyze_lead(lead: dict[str, Any], offer: str | None = None) -> dict[str, An
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key or api_key == "cole_sua_chave_aqui":
         raise RuntimeError("Configure GEMINI_API_KEY no arquivo .env antes de executar.")
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-2.0-flash"))
+
+    client = genai.Client(api_key=api_key)
+    model_name = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 
     safe_lead = {
         "name": str(lead.get("name", ""))[:200],
@@ -42,10 +43,10 @@ usa uma ferramenta se isso não estiver indicado. Diferencie:
 - indícios (ex.: itens de menu que podem não representar todo o catálogo);
 - informações não identificadas publicamente (ex.: sistema interno de gestão de vendas).
 A ausência de evidência pública NÃO significa que a empresa não use um sistema.
-Avalie se há uma oportunidade plausível para a oferta, considerando presença digital
-e meios públicos de atendimento/venda. Se houver poucos dados, diga isso. Não invente
-problemas de marketing. Crie mensagem inicial curta e respeitosa, com no máximo 80
-palavras, sem pressão e terminando com uma pergunta simples. Não afirme que já analisou
+Avalie se há uma oportunidade plausível para serviços de presença digital, considerando
+presença digital e meios públicos de atendimento/venda. Se houver poucos dados, diga isso.
+Não invente problemas de marketing. Crie mensagem inicial curta e respeitosa, com no máximo
+80 palavras, sem pressão e terminando com uma pergunta simples. Não afirme que já analisou
 o site em profundidade. Use [NOME DA SUA EMPRESA] como marcador de identidade.
 
 Oferta que quero apresentar: {offer or "serviços de presença digital"}
@@ -57,7 +58,7 @@ Responda SOMENTE com JSON válido neste formato:
 O score de 0 a 100 é apenas uma prioridade preliminar para revisão humana, não uma
 avaliação comprovada da qualidade ou da gestão do estabelecimento.
 """
-    response = model.generate_content(prompt)
+    response = client.models.generate_content(model=model_name, contents=prompt)
     raw = (getattr(response, "text", "") or "").strip()
     raw = re.sub(r"^\s*```(?:json)?\s*|\s*```\s*$", "", raw, flags=re.I)
     try:
