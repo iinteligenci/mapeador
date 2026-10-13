@@ -67,7 +67,7 @@ button{border:0;border-radius:10px;padding:12px 18px;background:var(--blue);colo
    <div style="grid-column:1/-1;display:flex;align-items:center;gap:10px"><input id="reanalyze" name="reanalyze" type="checkbox" value="yes" {% if reanalyze %}checked{% endif %} style="width:auto"><label for="reanalyze" style="margin:0">Reanalisar empresas já cadastradas para esta proposta</label></div>
   </div>
   <button id="submitButton" type="submit">⌕ Iniciar prospecção</button>
-  <div class="note">Por padrão, empresas já analisadas são ignoradas. Marque a opção acima para gerar uma nova análise para a proposta selecionada. Na opção “Ambas”, a IA avalia os dois perfis em uma chamada. Mensagens são apenas rascunhos.</div>
+  <div class="note">Pesquisar não chama a IA. Os dados básicos aparecem primeiro; use “Gerar proposta” em cada estabelecimento quando quiser uma análise comercial. A pesquisa pública complementar e a IA só rodam nessa etapa.</div>
  </form>
 </section>
 {% if error %}<div class="alert">{{ error }}</div>{% endif %}
@@ -83,10 +83,10 @@ button{border:0;border-radius:10px;padding:12px 18px;background:var(--blue);colo
  {% if results|length == 0 %}<p class="empty">{% if skipped %}Todos os estabelecimentos encontrados já estavam cadastrados. Não repetimos a análise. Confira a aba “Restaurantes já pesquisados”.{% else %}Nenhum estabelecimento novo retornado. Tente outro termo ou localidade.{% endif %}</p>{% else %}
  <div class="results" style="margin-top:16px">
  {% for item in results %}
-  {% set lead = item.lead %}{% set research = item.research %}{% set analysis = item.analysis %}
+  {% set lead = item.lead %}{% set research = item.research %}{% set analyses = item.analyses %}
   <article class="lead">
    <div class="leadhead"><div><h3>{{ lead.name }}</h3><div class="category">{{ lead.category or "Categoria não identificada" }}</div></div>
-   {% if analysis and analysis.score is defined %}<div class="score">{{ analysis.score }}/100 prioridade</div>{% else %}<div class="score unknown">IA pendente</div>{% endif %}</div>
+   {% if analyses %}<div class="score">{{ analyses|length }} proposta(s) gerada(s)</div>{% else %}<div class="score unknown">Proposta não gerada</div>{% endif %}</div>
    <div class="details">
     <div class="detail"><b>Telefone</b><div>{{ lead.phone or "Não identificado publicamente" }}</div></div>
     <div class="detail"><b>Endereço</b><div>{{ research.address or lead.address or "Não identificado publicamente" }}</div></div>
@@ -100,12 +100,25 @@ button{border:0;border-radius:10px;padding:12px 18px;background:var(--blue);colo
    {% if item.analyses %}
    {% for profile_key, analysis in item.analyses.items() %}
    <div class="analysis"><b>{{ "4K Food Service" if profile_key == "4k" else "Presença digital" }} · prioridade {{ analysis.score }}/100</b><p>{{ analysis.justificativa }}</p>
-    <div class="draft"><b>Rascunho de abordagem — não enviado</b>
+    <div class="draft"><b>Proposta comercial gerada — não enviada</b>
 {{ analysis.mensagem }}</div></div>
    {% endfor %}
-   {% else %}
-   <div class="alert" style="margin-top:14px">{{ item.error or "Análise de IA não concluída. Os dados públicos coletados continuam disponíveis." }}</div>
+   {% elif item.error %}
+   <div class="alert" style="margin-top:14px">{{ item.error }}</div>
    {% endif %}
+   <form class="statusform" method="post" action="/proposal">
+    <input type="hidden" name="lead_id" value="{{ item.lead_id }}">
+    <input type="hidden" name="term" value="{{ term }}">
+    <input type="hidden" name="limit" value="{{ limit }}">
+    <label for="proposal-profile-{{ item.lead_id }}" style="margin:0">Gerar proposta para</label>
+    <select id="proposal-profile-{{ item.lead_id }}" name="proposal_profile">
+      <option value="4k">4K Food Service</option>
+      <option value="digital">Presença digital</option>
+      <option value="both">Ambas as empresas</option>
+    </select>
+    <input name="proposal_offer" placeholder="Oferta personalizada (opcional)" style="max-width:280px">
+    <button type="submit">Gerar proposta</button>
+   </form>
    <form class="statusform" method="post" action="/status">
     <input type="hidden" name="lead_id" value="{{ item.lead_id }}">
     <label for="status-{{ item.lead_id }}" style="margin:0">Etapa comercial</label>
@@ -173,7 +186,6 @@ def search():
         ), 500
 
     results: list[dict[str, Any]] = []
-    analyzed = 0
     skipped = 0
     saved_by_link = {item.get("link"): item for item in get_leads(path=db_path)}
     for lead in leads:
@@ -181,60 +193,103 @@ def search():
             lead_id, inserted = save_lead(lead, db_path)
         except Exception:
             lead_id, inserted = None, True
-
-        # By default skip completed leads. A user can explicitly request a new offer/profile analysis.
-        existing = saved_by_link.get(lead.get("link"))
-        if not inserted and existing and existing.get("score") is not None and not reanalyze:
+        if not inserted:
             skipped += 1
-            continue
+        # Search results are quick: no website crawl and no Gemini call here.
+        research = {
+            "address": lead.get("address", ""),
+            "instagram": "",
+            "channels": [],
+            "menu_url": lead.get("menu_url", ""),
+            "menu_items": [],
+            "public_platforms": [],
+            "research_notes": [],
+            "sources": [],
+        }
+        results.append({
+            "lead": lead,
+            "lead_id": lead_id,
+            "research": research,
+            "analyses": None,
+            "error": None,
+        })
 
-        try:
-            research = research_public_site(lead)
-        except Exception as exc:
-            research = {
-                "address": lead.get("address", ""), "instagram": "", "channels": [],
-                "menu_url": lead.get("menu_url", ""), "menu_items": [],
-                "public_platforms": [], "research_notes": [
-                    f"Pesquisa complementar falhou ({type(exc).__name__})."
-                ], "sources": []
-            }
+    return render_template_string(
+        PAGE, term=term, limit=limit, offer=offer, profile=profile, reanalyze=reanalyze, results=results,
+        analyzed=0, failed=0, skipped=skipped, error=None
+    )
+
+
+@app.post("/proposal")
+def generate_proposal():
+    db_path = os.getenv("DATABASE_PATH", "data/mapeador.sqlite3")
+    try:
+        lead_id = int(request.form.get("lead_id", ""))
+    except (ValueError, TypeError):
+        return "Estabelecimento inválido.", 400
+
+    records = get_leads(path=db_path)
+    saved = next((item for item in records if item.get("id") == lead_id), None)
+    if not saved:
+        return "Estabelecimento não encontrado no histórico.", 404
+
+    profile = (request.form.get("proposal_profile") or "4k").strip()
+    if profile not in {"4k", "digital", "both"}:
+        profile = "4k"
+    selected_profiles = ["4k", "digital"] if profile == "both" else [profile]
+    offer = (request.form.get("proposal_offer") or "").strip()
+    lead = {
+        "name": saved.get("name", ""),
+        "category": saved.get("category", ""),
+        "link": saved.get("link", ""),
+        "phone": saved.get("phone", ""),
+        "address": "",
+        "website": saved.get("website", ""),
+    }
+    error = None
+    analyses = None
+    try:
+        research = research_public_site(lead)
         analysis_lead = {
             **lead,
             "address": research.get("address") or lead.get("address", ""),
             "instagram": research.get("instagram", ""),
             "channels": research.get("channels", []),
-            "menu_url": research.get("menu_url") or lead.get("menu_url", ""),
+            "menu_url": research.get("menu_url", ""),
             "menu_items": research.get("menu_items", []),
             "public_platforms": research.get("public_platforms", []),
             "research_notes": research.get("research_notes", []),
         }
-        analyses = None
-        error = None
-        try:
-            analyses = analyze_lead_profiles(analysis_lead, selected_profiles, offer)
-            analyzed += 1
-            if lead_id is not None:
-                combined = {
-                    "score": max(item["score"] for item in analyses.values()),
-                    "justificativa": "\n".join(
-                        f"{'4K Food Service' if key == '4k' else 'Presença digital'}: {item['justificativa']}"
-                        for key, item in analyses.items()
-                    ),
-                    "mensagem": "\n\n".join(
-                        f"{'4K Food Service' if key == '4k' else 'Presença digital'} — rascunho não enviado:\n{item['mensagem']}"
-                        for key, item in analyses.items()
-                    ),
-                }
-                update_analysis(lead_id, combined, db_path)
-        except Exception as exc:
-            error = f"IA não concluiu ({type(exc).__name__}). Os dados coletados foram mantidos."
-        results.append({"lead": lead, "lead_id": lead_id, "research": research, "analyses": analyses, "error": error})
+        analyses = analyze_lead_profiles(analysis_lead, selected_profiles, offer)
+        combined = {
+            "score": max(item["score"] for item in analyses.values()),
+            "justificativa": "\n".join(
+                f"{'4K Food Service' if key == '4k' else 'Presença digital'}: {item['justificativa']}"
+                for key, item in analyses.items()
+            ),
+            "mensagem": "\n\n".join(
+                f"{'4K Food Service' if key == '4k' else 'Presença digital'} — proposta não enviada:\n{item['mensagem']}"
+                for key, item in analyses.items()
+            ),
+        }
+        update_analysis(lead_id, combined, db_path)
+    except Exception as exc:
+        research = locals().get("research", {
+            "address": "", "instagram": "", "channels": [], "menu_url": "",
+            "menu_items": [], "public_platforms": [], "research_notes": [], "sources": []
+        })
+        error = f"Não foi possível gerar a proposta ({type(exc).__name__}: {exc}). Os dados do estabelecimento continuam salvos."
 
+    item = {"lead": lead, "lead_id": lead_id, "research": research, "analyses": analyses, "error": error}
+    try:
+        page_limit = max(1, min(15, int(request.form.get("limit", "3") or "3")))
+    except ValueError:
+        page_limit = 3
     return render_template_string(
-        PAGE, term=term, limit=limit, offer=offer, profile=profile, reanalyze=reanalyze, results=results,
-        analyzed=analyzed, failed=len(results) - analyzed, skipped=skipped, error=None
+        PAGE, term=request.form.get("term", "restaurantes em Vila Velha ES"),
+        limit=page_limit, offer="", profile=profile, reanalyze=False, results=[item],
+        analyzed=1 if analyses else 0, failed=0 if analyses else 1, skipped=0, error=None
     )
-
 
 
 STATUS_LABELS = {
