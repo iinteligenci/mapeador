@@ -158,11 +158,18 @@ def search():
 
     results: list[dict[str, Any]] = []
     analyzed = 0
+    skipped = 0
     for lead in leads:
         try:
-            lead_id, _ = save_lead(lead, db_path)
+            lead_id, inserted = save_lead(lead, db_path)
         except Exception:
-            lead_id = None
+            lead_id, inserted = None, True
+
+        # Existing records are not researched or sent to Gemini again.
+        if not inserted:
+            skipped += 1
+            continue
+
         try:
             research = research_public_site(lead)
         except Exception as exc:
