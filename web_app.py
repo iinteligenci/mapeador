@@ -1,0 +1,199 @@
+"""Interface web local do Mapeador; não expõe o serviço na rede pública."""
+from __future__ import annotations
+
+import asyncio
+import os
+import threading
+import webbrowser
+from datetime import datetime
+from typing import Any
+
+from dotenv import load_dotenv
+from flask import Flask, render_template_string, request
+
+from ai_agent.analyzer import analyze_lead
+from database.db import init_db, save_lead, update_analysis
+from scraper.maps_scraper import search_google_maps
+from scraper.site_research import research_public_site
+
+load_dotenv()
+app = Flask(__name__)
+app.config["MAX_CONTENT_LENGTH"] = 1 * 1024 * 1024
+
+PAGE = r"""
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mapeador | Prospecção inteligente</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1220;--panel:#121d30;--line:#26354d;--muted:#a6b4ca;--text:#edf4ff;--blue:#4da3ff;--green:#35d49a}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top left,#162b49 0,#0b1220 48%);font:15px/1.5 Inter,Segoe UI,Arial,sans-serif;color:var(--text)}
+main{max-width:1180px;margin:auto;padding:36px 22px 64px}.brand{display:flex;align-items:center;gap:12px}.mark{width:46px;height:46px;border-radius:14px;background:linear-gradient(135deg,#58b7ff,#5b6cff);display:grid;place-items:center;font-size:24px;font-weight:800;color:white}
+h1{font-size:28px;line-height:1.15;margin:0} .sub{color:var(--muted);margin:5px 0 26px}
+.panel{background:rgba(18,29,48,.94);border:1px solid var(--line);border-radius:18px;padding:22px;margin:18px 0;box-shadow:0 16px 48px #0002}
+h2{font-size:18px;margin:0 0 16px}.formgrid{display:grid;grid-template-columns:minmax(220px,2fr) minmax(140px,1fr) minmax(220px,1.5fr);gap:14px}
+label{display:block;color:var(--muted);font-size:13px;margin-bottom:6px}input,select{width:100%;border:1px solid #354761;background:#0c1627;color:var(--text);border-radius:10px;padding:12px;font:inherit}
+button{border:0;border-radius:10px;padding:12px 18px;background:var(--blue);color:#071321;font-weight:750;cursor:pointer;margin-top:16px}button:disabled{opacity:.6;cursor:wait}
+.note{font-size:12px;color:var(--muted);margin-top:12px}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.stat{background:#0d1829;border:1px solid var(--line);border-radius:12px;padding:14px}.stat strong{display:block;font-size:24px}.stat span{font-size:12px;color:var(--muted)}
+.alert{border-radius:12px;padding:13px 15px;margin:14px 0;background:#392b14;border:1px solid #79551e;color:#ffdda0}.success{background:#102e2a;border-color:#236d5c;color:#a9f3d9}
+.results{display:grid;gap:14px}.lead{border:1px solid var(--line);background:#0d1829;border-radius:14px;padding:18px}.leadhead{display:flex;justify-content:space-between;gap:16px;align-items:start}.lead h3{margin:0 0 4px;font-size:18px}.category{color:var(--muted);font-size:13px}.score{white-space:nowrap;border-radius:99px;padding:5px 10px;background:#123a35;color:#83f0ce;font-weight:700;font-size:13px}.score.unknown{background:#302a1d;color:#ffdb91}
+.details{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:15px}.detail{border-top:1px solid #26354d;padding-top:9px;min-width:0}.detail b{display:block;color:var(--muted);font-size:12px;font-weight:500}.detail a{color:#83c5ff;overflow-wrap:anywhere}.detail div{overflow-wrap:anywhere}
+.analysis{margin-top:15px;padding:13px;border-radius:10px;background:#14243a}.analysis b{font-size:13px}.analysis p{margin:5px 0}.draft{margin-top:10px;padding:12px;border-left:3px solid var(--blue);background:#101e31;white-space:pre-wrap}
+.empty{color:var(--muted);padding:18px 0}.footer{font-size:12px;color:var(--muted);text-align:center;margin-top:24px}
+@media(max-width:720px){main{padding:22px 14px}.formgrid,.stats,.details{grid-template-columns:1fr}h1{font-size:24px}.leadhead{flex-direction:column}.score{align-self:start}}
+</style>
+</head>
+<body><main>
+<header>
+ <div class="brand"><div class="mark">M</div><div><h1>Mapeador</h1><div class="category">Inteligência comercial para negócios alimentícios</div></div></div>
+ <p class="sub">Encontre estabelecimentos, investigue sua presença digital e organize oportunidades para revisão humana.</p>
+</header>
+<section class="panel">
+ <h2>Nova prospecção</h2>
+ <form id="searchForm" method="post" action="/search">
+  <div class="formgrid">
+   <div><label for="term">O que pesquisar e onde?</label><input id="term" name="term" value="{{ term }}" required placeholder="Ex.: restaurantes em Vila Velha ES"></div>
+   <div><label for="limit">Quantidade máxima</label><select id="limit" name="limit">{% for n in [3,5,10,15] %}<option value="{{n}}" {% if limit == n %}selected{% endif %}>{{n}} negócios</option>{% endfor %}</select></div>
+   <div><label for="offer">Sua oferta comercial</label><input id="offer" name="offer" value="{{ offer }}" required placeholder="Serviços de presença digital"></div>
+  </div>
+  <button id="submitButton" type="submit">⌕ Iniciar prospecção</button>
+  <div class="note">A pesquisa pode levar alguns minutos. Mensagens são apenas rascunhos; nada é enviado automaticamente.</div>
+ </form>
+</section>
+{% if error %}<div class="alert">{{ error }}</div>{% endif %}
+{% if results is not none %}
+<section class="panel">
+ <h2>Resultado desta pesquisa</h2>
+ <div class="stats">
+  <div class="stat"><strong>{{ results|length }}</strong><span>Estabelecimentos encontrados</span></div>
+  <div class="stat"><strong>{{ analyzed }}</strong><span>Análises de IA concluídas</span></div>
+  <div class="stat"><strong>{{ failed }}</strong><span>Análises pendentes ou com erro</span></div>
+ </div>
+ {% if results|length == 0 %}<p class="empty">Nenhum estabelecimento retornado. Tente outro termo ou localidade.</p>{% else %}
+ <div class="results" style="margin-top:16px">
+ {% for item in results %}
+  {% set lead = item.lead %}{% set research = item.research %}{% set analysis = item.analysis %}
+  <article class="lead">
+   <div class="leadhead"><div><h3>{{ lead.name }}</h3><div class="category">{{ lead.category or "Categoria não identificada" }}</div></div>
+   {% if analysis and analysis.score is defined %}<div class="score">{{ analysis.score }}/100 prioridade</div>{% else %}<div class="score unknown">IA pendente</div>{% endif %}</div>
+   <div class="details">
+    <div class="detail"><b>Telefone</b><div>{{ lead.phone or "Não identificado publicamente" }}</div></div>
+    <div class="detail"><b>Endereço</b><div>{{ research.address or lead.address or "Não identificado publicamente" }}</div></div>
+    <div class="detail"><b>Site</b><div>{% if lead.website %}<a href="{{lead.website}}" target="_blank" rel="noopener">{{lead.website}}</a>{% else %}Não identificado publicamente{% endif %}</div></div>
+    <div class="detail"><b>Instagram</b><div>{% if research.instagram %}<a href="{{research.instagram}}" target="_blank" rel="noopener">Abrir perfil</a>{% else %}Não identificado publicamente{% endif %}</div></div>
+    <div class="detail"><b>Canais digitais</b><div>{{ research.channels|join(", ") if research.channels else "Não identificado publicamente" }}</div></div>
+    <div class="detail"><b>Cardápio / catálogo</b><div>{% if research.menu_url %}<a href="{{research.menu_url}}" target="_blank" rel="noopener">Abrir cardápio</a>{% else %}Não identificado publicamente{% endif %}</div></div>
+    <div class="detail"><b>Itens em páginas públicas</b><div>{{ research.menu_items[:12]|join(", ") if research.menu_items else "Não identificado publicamente" }}</div></div>
+    <div class="detail"><b>Plataformas encontradas publicamente</b><div>{{ research.public_platforms|join(", ") if research.public_platforms else "Não identificado publicamente" }}</div></div>
+   </div>
+   {% if analysis %}
+   <div class="analysis"><b>Leitura comercial preliminar</b><p>{{ analysis.justificativa }}</p>
+    <div class="draft"><b>Rascunho de abordagem — não enviado</b>
+{{ analysis.mensagem }}</div></div>
+   {% else %}
+   <div class="alert" style="margin-top:14px">{{ item.error or "Análise de IA não concluída. Os dados públicos coletados continuam disponíveis." }}</div>
+   {% endif %}
+   {% if research.research_notes %}<div class="note">{{ research.research_notes|join(" ") }}</div>{% endif %}
+   {% if lead.link %}<div class="note"><a href="{{lead.link}}" target="_blank" rel="noopener">Ver no Google Maps ↗</a></div>{% endif %}
+  </article>
+ {% endfor %}
+ </div>{% endif %}
+ <div class="note">Dados públicos podem estar incompletos. “Não identificado” não significa que a empresa não tenha o canal ou a ferramenta.</div>
+</section>
+{% endif %}
+<div class="footer">Mapeador · Pesquisa pública · Revisão humana obrigatória · Sem envio automático de mensagens</div>
+</main>
+<script>
+document.getElementById('searchForm').addEventListener('submit', function(){
+ const b=document.getElementById('submitButton'); b.disabled=true; b.textContent='Pesquisando… aguarde';
+});
+</script>
+</body></html>
+"""
+
+
+@app.get("/")
+def index():
+    return render_template_string(
+        PAGE, term="restaurantes em Vila Velha ES", limit=3,
+        offer="serviços de presença digital", results=None, analyzed=0, failed=0, error=None
+    )
+
+
+@app.post("/search")
+def search():
+    term = (request.form.get("term") or "").strip()
+    offer = (request.form.get("offer") or "serviços de presença digital").strip()
+    try:
+        limit = max(1, min(15, int(request.form.get("limit", "3"))))
+    except ValueError:
+        limit = 3
+    if not term:
+        return render_template_string(
+            PAGE, term=term, limit=limit, offer=offer, results=None,
+            analyzed=0, failed=0, error="Informe o que pesquisar e a localidade."
+        ), 400
+
+    db_path = os.getenv("DATABASE_PATH", "data/mapeador.sqlite3")
+    init_db(db_path)
+    try:
+        leads = asyncio.run(search_google_maps(term, limit))
+    except Exception as exc:
+        return render_template_string(
+            PAGE, term=term, limit=limit, offer=offer, results=[],
+            analyzed=0, failed=0, error=f"Falha na pesquisa do Maps: {type(exc).__name__}: {exc}"
+        ), 500
+
+    results: list[dict[str, Any]] = []
+    analyzed = 0
+    for lead in leads:
+        try:
+            lead_id, _ = save_lead(lead, db_path)
+        except Exception:
+            lead_id = None
+        try:
+            research = research_public_site(lead)
+        except Exception as exc:
+            research = {
+                "address": lead.get("address", ""), "instagram": "", "channels": [],
+                "menu_url": lead.get("menu_url", ""), "menu_items": [],
+                "public_platforms": [], "research_notes": [
+                    f"Pesquisa complementar falhou ({type(exc).__name__})."
+                ], "sources": []
+            }
+        analysis_lead = {
+            **lead,
+            "address": research.get("address") or lead.get("address", ""),
+            "instagram": research.get("instagram", ""),
+            "channels": research.get("channels", []),
+            "menu_url": research.get("menu_url") or lead.get("menu_url", ""),
+            "menu_items": research.get("menu_items", []),
+            "public_platforms": research.get("public_platforms", []),
+            "research_notes": research.get("research_notes", []),
+        }
+        analysis = None
+        error = None
+        try:
+            analysis = analyze_lead(analysis_lead, offer)
+            analyzed += 1
+            if lead_id is not None:
+                update_analysis(lead_id, analysis, db_path)
+        except Exception as exc:
+            error = f"IA não concluiu ({type(exc).__name__}). Os dados coletados foram mantidos."
+        results.append({"lead": lead, "research": research, "analysis": analysis, "error": error})
+
+    return render_template_string(
+        PAGE, term=term, limit=limit, offer=offer, results=results,
+        analyzed=analyzed, failed=len(results) - analyzed, error=None
+    )
+
+
+def _open_browser() -> None:
+    webbrowser.open("http://127.0.0.1:5000")
+
+
+if __name__ == "__main__":
+    threading.Timer(1.0, _open_browser).start()
+    app.run(host="127.0.0.1", port=int(os.getenv("PORT", "5000")), debug=False)
