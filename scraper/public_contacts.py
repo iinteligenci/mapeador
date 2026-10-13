@@ -35,6 +35,9 @@ def find_public_business_contacts(lead: dict[str, Any], max_pages: int = MAX_PAG
         "contact_confidence": "Não identificado",
         "contact_notes": [],
         "contact_sources": [],
+        "contact_emails": [],
+        "contact_phones": [],
+        "contact_whatsapps": [],
         "cnpj": "",
         "cnpj_source": "",
     }
@@ -67,6 +70,7 @@ def find_public_business_contacts(lead: dict[str, Any], max_pages: int = MAX_PAG
     visited: set[str] = set()
     phones: list[tuple[str, str]] = []
     whatsapps: list[tuple[str, str]] = []
+    emails: list[tuple[str, str]] = []
     role_candidates: list[tuple[str, str, str]] = []
 
     while queue and len(visited) < max(1, min(max_pages, 8)):
@@ -100,11 +104,19 @@ def find_public_business_contacts(lead: dict[str, Any], max_pages: int = MAX_PAG
             if role_match:
                 role_candidates.append((name, _clean(role_match.group(1)), response.url))
 
+        for match in re.finditer(r"(?i)\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}\\b", text):
+            email = match.group(0).strip(".,;:")
+            emails.append((email, response.url))
+
         for anchor in soup.find_all("a", href=True):
             href = _clean(anchor.get("href"))
             label = _clean(anchor.get_text(" ", strip=True))
             absolute = urljoin(response.url, href)
             low = absolute.lower()
+            if low.startswith("mailto:"):
+                email = absolute[7:].split("?")[0].strip()
+                if "@" in email:
+                    emails.append((email, response.url))
             if low.startswith("tel:"):
                 number = re.sub(r"^tel:", "", absolute, flags=re.I).strip()
                 if number:
@@ -139,6 +151,17 @@ def find_public_business_contacts(lead: dict[str, Any], max_pages: int = MAX_PAG
 
     phones = unique(phones)
     whatsapps = unique(whatsapps)
+    email_seen: set[str] = set()
+    unique_emails: list[tuple[str, str]] = []
+    for value, source in emails:
+        key = value.casefold()
+        if key not in email_seen:
+            email_seen.add(key)
+            unique_emails.append((value, source))
+    emails = unique_emails
+    result["contact_emails"] = [value for value, _ in emails]
+    result["contact_phones"] = [value for value, _ in phones]
+    result["contact_whatsapps"] = [value for value, _ in whatsapps]
     if role_candidates:
         result["contact_name"], result["contact_role"], source = role_candidates[0]
         result["contact_source"] = source
