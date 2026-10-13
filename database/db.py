@@ -97,7 +97,7 @@ def update_analysis(lead_id: int, analysis: dict[str, Any], path: str | None = N
     with _connect(path) as conn:
         conn.execute("""
             UPDATE leads
-            SET score = ?, justification = ?, message = ?, status = 'draft_ready',
+            SET score = ?, justification = ?, message = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         """, (
