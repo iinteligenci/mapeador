@@ -8,3 +8,4 @@ __pycache__/
 data/
 *.sqlite3
 *.db
+reports/
