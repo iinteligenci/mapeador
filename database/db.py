@@ -85,6 +85,32 @@ def init_db(path: str | None = None) -> None:
                 FOREIGN KEY(lead_id) REFERENCES leads(id) ON DELETE CASCADE
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS automation_settings (
+                id INTEGER PRIMARY KEY CHECK(id=1), enabled INTEGER NOT NULL DEFAULT 0,
+                search_term TEXT NOT NULL DEFAULT 'restaurantes em Vila Velha ES',
+                batch_size INTEGER NOT NULL DEFAULT 3,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.execute("INSERT OR IGNORE INTO automation_settings(id, enabled, search_term, batch_size) VALUES (1, 0, 'restaurantes em Vila Velha ES', 3)")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS proposals (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, lead_id INTEGER NOT NULL,
+                profile TEXT NOT NULL, contact_type TEXT NOT NULL DEFAULT 'empresa',
+                contact_value TEXT NOT NULL DEFAULT '', source_url TEXT NOT NULL DEFAULT '',
+                score INTEGER NOT NULL DEFAULT 0, justification TEXT NOT NULL DEFAULT '',
+                message TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'draft',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(lead_id, profile, contact_type, contact_value),
+                FOREIGN KEY(lead_id) REFERENCES leads(id) ON DELETE CASCADE
+            )
+        """)
+        lead_columns = {row["name"] for row in conn.execute("PRAGMA table_info(leads)").fetchall()}
+        for column in ("contact_emails", "contact_phones", "contact_whatsapps"):
+            if column not in lead_columns:
+                conn.execute(f"ALTER TABLE leads ADD COLUMN {column} TEXT NOT NULL DEFAULT ''")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_proposals_profile ON proposals(profile, created_at)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_leads_name ON leads(name)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status)")
         # Compatibilidade com registros criados pelas versões anteriores.
@@ -262,3 +288,55 @@ def update_lead_status(lead_id: int, status: str, path: str | None = None) -> No
         )
         if cursor.rowcount == 0:
             raise ValueError("Estabelecimento não encontrado.")
+
+
+
+def get_automation_settings(path: str | None = None) -> dict[str, Any]:
+    init_db(path)
+    with _connect(path) as conn:
+        row = conn.execute("SELECT * FROM automation_settings WHERE id=1").fetchone()
+        return dict(row) if row else {"enabled": 0, "search_term": "restaurantes em Vila Velha ES", "batch_size": 3}
+
+
+def set_automation_settings(enabled: bool, search_term: str, batch_size: int = 3, path: str | None = None) -> None:
+    init_db(path)
+    term = str(search_term or "").strip()
+    if not term:
+        raise ValueError("Informe o tipo de negócio e a localidade para a pesquisa automática.")
+    size = max(1, min(10, int(batch_size)))
+    with _connect(path) as conn:
+        conn.execute("""UPDATE automation_settings SET enabled=?, search_term=?, batch_size=?, updated_at=CURRENT_TIMESTAMP WHERE id=1""",
+                     (int(enabled), term, size))
+
+
+def save_proposal(lead_id: int, profile: str, contact_type: str, contact_value: str,
+                  source_url: str, analysis: dict[str, Any], path: str | None = None) -> None:
+    if profile not in {"4k", "digital"}:
+        raise ValueError("Perfil inválido.")
+    init_db(path)
+    with _connect(path) as conn:
+        conn.execute("""INSERT INTO proposals
+            (lead_id, profile, contact_type, contact_value, source_url, score, justification, message)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(lead_id, profile, contact_type, contact_value) DO UPDATE SET
+            source_url=excluded.source_url, score=excluded.score, justification=excluded.justification,
+            message=excluded.message, created_at=CURRENT_TIMESTAMP""",
+            (lead_id, profile, contact_type, contact_value, source_url or "",
+             max(0, min(100, int(analysis.get("score", 0)))),
+             str(analysis.get("justificativa") or ""), str(analysis.get("mensagem") or "")))
+
+
+def get_proposals(profile: str | None = None, path: str | None = None) -> list[dict[str, Any]]:
+    init_db(path)
+    with _connect(path) as conn:
+        if profile in {"4k", "digital"}:
+            rows = conn.execute("""SELECT p.*, l.name AS lead_name, l.category, l.phone, l.website
+                FROM proposals p JOIN leads l ON l.id=p.lead_id
+                WHERE p.profile=? AND l.status NOT IN ('removed','in_person')
+                ORDER BY p.created_at DESC, p.id DESC""", (profile,))
+        else:
+            rows = conn.execute("""SELECT p.*, l.name AS lead_name, l.category, l.phone, l.website
+                FROM proposals p JOIN leads l ON l.id=p.lead_id
+                WHERE l.status NOT IN ('removed','in_person')
+                ORDER BY p.created_at DESC, p.id DESC""")
+        return [dict(row) for row in rows]
