@@ -616,9 +616,12 @@ def automatic_toggle():
 @app.post("/automatic/save")
 def automatic_save():
     term = (request.form.get("search_term") or "").strip()
+    db_path = os.getenv("DATABASE_PATH", "data/mapeador.sqlite3")
     try:
         size = int(request.form.get("batch_size", "3"))
-        set_automation_settings(request.form.get("enabled") == "yes", term, size, os.getenv("DATABASE_PATH", "data/mapeador.sqlite3"))
+        # Preserve the current on/off state when only changing search settings.
+        current = get_automation_settings(db_path)
+        set_automation_settings(bool(current.get("enabled")), term, size, db_path)
     except (ValueError, TypeError) as exc:
         return f"Configuração inválida: {exc}", 400
     return redirect(url_for("automatic_mode"))
