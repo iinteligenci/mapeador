@@ -207,8 +207,10 @@ def queue_campaign(campaign_id: int, lead_ids: list[int], path: str | None = Non
                 """INSERT OR IGNORE INTO campaign_events(campaign_id, lead_id)
                    SELECT ?, ? WHERE NOT EXISTS (
                      SELECT 1 FROM campaign_events WHERE lead_id=? AND status='opted_out'
+                   ) AND NOT EXISTS (
+                     SELECT 1 FROM leads WHERE id=? AND status='in_person'
                    )""",
-                (campaign_id, lead_id, lead_id),
+                (campaign_id, lead_id, lead_id, lead_id),
             )
 
 
@@ -249,7 +251,7 @@ def get_leads(status: str | None = None, path: str | None = None) -> list[dict[s
 
 def update_lead_status(lead_id: int, status: str, path: str | None = None) -> None:
     """Atualiza o estágio comercial de um estabelecimento."""
-    allowed = {"to_visit", "visited", "client"}
+    allowed = {"to_visit", "visited", "client", "in_person"}
     if status not in allowed:
         raise ValueError("Status inválido.")
     init_db(path)
