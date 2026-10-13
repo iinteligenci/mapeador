@@ -76,3 +76,23 @@ Nunca publique o arquivo `.env` nem compartilhe a chave. O projeto usa o SDK atu
 - Itens do cardápio são extraídos de textos visíveis, não de imagens/PDFs; confirme no link de origem.
 - A qualificação por IA é uma hipótese para revisão humana. Mensagens comerciais ficam como rascunhos; nada é enviado automaticamente.
 - Respeite a LGPD, os termos das plataformas e pedidos para não receber contato.
+
+## Interface web local
+
+O projeto também inclui uma interface visual para pesquisar pelo navegador, sem precisar preencher comandos a cada consulta.
+
+1. Atualize o repositório no GitHub Desktop (Fetch origin e depois Pull origin, se aparecer).
+2. Na pasta do projeto, instale a dependência nova:
+   ```bat
+   py -m pip install -r requirements.txt
+   ```
+3. Confira se o arquivo local `.env` contém sua chave válida e um modelo Gemini disponível. Nunca publique esse arquivo.
+4. Inicie a interface:
+   ```bat
+   py web_app.py
+   ```
+5. O navegador abrirá em `http://127.0.0.1:5000`. Se não abrir automaticamente, cole esse endereço no navegador.
+6. Preencha termo/localidade, quantidade e oferta. Os resultados aparecerão na página com canais públicos, cardápio, prioridade preliminar e rascunho de mensagem.
+
+A interface roda no próprio computador; não fica publicada na internet. Feche o terminal para encerrar. A pesquisa pode levar alguns minutos. A aplicação não envia mensagens automaticamente. A coleta via navegador e as chamadas de IA dependem de internet e podem sofrer limitações temporárias.
+
