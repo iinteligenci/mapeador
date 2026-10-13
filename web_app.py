@@ -577,9 +577,9 @@ AUTO_PAGE = r"""
 <h2 style="margin-top:24px">Configuração da pesquisa</h2>
 <form method="post" action="/automatic/save">
 <label>O que pesquisar (tipo de negócio + localidade)</label><input name="search_term" required value="{{settings.search_term}}" placeholder="Ex.: restaurantes e bares em Vila Velha ES">
-<label>Novos negócios por ciclo</label><select name="batch_size">{% for n in [1,2,3,5,10] %}<option value="{{n}}" {% if settings.batch_size == n %}selected{% endif %}>{{n}}</option>{% endfor %}</select>
+<label>Limite de novos negócios por busca</label><select name="batch_size">{% for n in [1,2,3,5,10] %}<option value="{{n}}" {% if settings.batch_size == n %}selected{% endif %}>{{n}}</option>{% endfor %}</select>
 <button type="submit">Salvar configuração</button></form>
-<p class="muted">Quando ligada, a automação roda em ciclos de aproximadamente 5 minutos. Cada ciclo também leva tempo para executar as buscas. O computador e o programa precisam permanecer ligados. Limites de acesso, falhas de sites e limites da API podem atrasar a pesquisa; o sistema não contorna bloqueios.</p>
+<p class="muted">Quando ligada, a automação trabalha continuamente: termina uma tarefa e segue para a próxima, sem esperar 5 minutos entre ciclos. Se não houver trabalho disponível, faz uma pausa curta antes de verificar novamente. O computador e o programa precisam permanecer ligados. Limites de acesso, falhas de sites e limites da API podem atrasar a pesquisa; o sistema não contorna bloqueios.</p>
 <p class="muted"><strong>Importante:</strong> propostas são apenas rascunhos para revisão humana. O Mapeador não envia mensagens automaticamente. Contatos só são usados quando encontrados em páginas públicas; dados não confirmados não são inventados.</p></section></main></body></html>
 """
 
