@@ -53,7 +53,7 @@ button{border:0;border-radius:10px;padding:12px 18px;background:var(--blue);colo
 <header>
  <div class="brand"><div class="mark">M</div><div><h1>Mapeador</h1><div class="category">Inteligência comercial para negócios alimentícios</div></div></div>
  <p class="sub">Encontre estabelecimentos, investigue sua presença digital e organize oportunidades para revisão humana.</p>
- <nav class="nav"><a href="/">＋ Nova prospecção</a><a href="/history">▤ Estabelecimentos encontrados</a><a href="/campaigns">✉ Campanhas</a></nav>
+ <nav class="nav"><a href="/">＋ Nova prospecção</a><a href="/history">▤ Estabelecimentos encontrados</a><a href="/visits">📍 Visitas presenciais</a><a href="/campaigns">✉ Campanhas</a></nav>
 </header>
 <section class="panel">
  <h2>Nova prospecção</h2>
@@ -136,6 +136,7 @@ button{border:0;border-radius:10px;padding:12px 18px;background:var(--blue);colo
       <option value="to_visit" selected>Para visitar</option>
       <option value="visited">Visitado</option>
       <option value="client">Cliente</option>
+      <option value="in_person">Visita presencial (fora das campanhas)</option>
     </select>
     <button type="submit">Salvar etapa</button>
    </form>
@@ -291,7 +292,8 @@ def create_campaign():
     leads = get_leads(path=db_path)
     eligible = [
         int(lead["id"]) for lead in leads
-        if (lead.get("contact_whatsapp") or lead.get("contact_phone") or lead.get("phone"))
+        if lead.get("status") != "in_person"
+        and (lead.get("contact_whatsapp") or lead.get("contact_phone") or lead.get("phone"))
     ]
     queue_campaign(campaign_id, eligible, db_path)
     return redirect(url_for("campaign_detail", campaign_id=campaign_id))
@@ -403,6 +405,7 @@ STATUS_LABELS = {
     "to_visit": "Para visitar",
     "visited": "Visitado",
     "client": "Cliente",
+    "in_person": "Visita presencial",
 }
 
 
@@ -411,9 +414,9 @@ def history():
     db_path = os.getenv("DATABASE_PATH", "data/mapeador.sqlite3")
     init_db(db_path)
     selected = (request.args.get("status") or "all").strip()
-    if selected not in {"all", *STATUS_LABELS.keys()}:
+    if selected not in {"all", "to_visit", "visited", "client"}:
         selected = "all"
-    leads = get_leads(path=db_path)
+    leads = [lead for lead in get_leads(path=db_path) if lead.get("status") != "in_person"]
     for lead in leads:
         if lead.get("status") not in STATUS_LABELS:
             lead["status"] = "to_visit"
@@ -421,6 +424,16 @@ def history():
     if selected != "all":
         leads = [lead for lead in leads if lead["status"] == selected]
     return render_template_string(HISTORY_PAGE, leads=leads, selected=selected, labels=STATUS_LABELS)
+
+
+@app.get("/visits")
+def visits():
+    db_path = os.getenv("DATABASE_PATH", "data/mapeador.sqlite3")
+    init_db(db_path)
+    leads = [lead for lead in get_leads(path=db_path) if lead.get("status") == "in_person"]
+    for lead in leads:
+        lead["status_label"] = "Visita presencial"
+    return render_template_string(VISITS_PAGE, leads=leads, selected="in_person", labels=STATUS_LABELS)
 
 
 @app.post("/status")
@@ -487,12 +500,13 @@ main{max-width:1180px;margin:auto;padding:34px 22px 64px}.brand{display:flex;gap
 </section></main></body></html>
 """
 
+VISITS_PAGE = HISTORY_PAGE.replace("Mapeador | Estabelecimentos encontrados", "Mapeador | Visitas presenciais").replace("<h1>Estabelecimentos encontrados</h1>", "<h1>Visitas presenciais</h1>").replace("Seu histórico comercial fica salvo no banco local.", "Lista separada de estabelecimentos reservados para abordagem presencial. Não entram nas campanhas nem na lista geral.").replace("{{ leads|length }} estabelecimento(s) nesta lista", "{{ leads|length }} estabelecimento(s) para visita presencial").replace('<div class="filters">\n<a href="/history" class="{{ \'active\' if selected == \'all\' else \'' }}">Todos</a>\n<a href="/history?status=to_visit" class="{{ \'active\' if selected == \'to_visit\' else \'' }}">Para visitar</a>\n<a href="/history?status=visited" class="{{ \'active\' if selected == \'visited\' else \'' }}">Visitados</a>\n<a href="/history?status=client" class="{{ \'active\' if selected == \'client\' else \'' }}">Clientes</a>\n</div>', '')
 
 CAMPAIGNS_PAGE = r"""
 <!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Mapeador | Campanhas</title><style>
 body{margin:0;background:#0b1220;color:#edf4ff;font:15px/1.5 Segoe UI,Arial}main{max-width:1000px;margin:auto;padding:28px 16px}.panel,.entry{background:#121d30;border:1px solid #26354d;border-radius:14px;padding:18px;margin:14px 0}input,textarea,select{box-sizing:border-box;width:100%;background:#0c1627;color:#edf4ff;border:1px solid #354761;border-radius:9px;padding:11px;font:inherit;margin:5px 0 12px}button,.btn{display:inline-block;background:#4da3ff;color:#071321;border:0;border-radius:9px;padding:10px 14px;font-weight:700;text-decoration:none;cursor:pointer}a{color:#83c5ff}.nav{display:flex;gap:12px;margin:16px 0}.muted{color:#a6b4ca;font-size:13px}
-</style></head><body><main><h1>Central de campanhas</h1><p class="muted">Você cria e revisa a mensagem. A abertura do WhatsApp é manual; nada é enviado automaticamente.</p><nav class="nav"><a href="/">Nova prospecção</a><a href="/history">Estabelecimentos encontrados</a></nav>
+</style></head><body><main><h1>Central de campanhas</h1><p class="muted">Você cria e revisa a mensagem. A abertura do WhatsApp é manual; nada é enviado automaticamente.</p><nav class="nav"><a href="/">Nova prospecção</a><a href="/history">Estabelecimentos encontrados</a><a href="/visits">Visitas presenciais</a></nav>
 <section class="panel"><h2>Nova campanha</h2><form method="post" action="/campaigns/create">
 <label>Nome da campanha</label><input name="name" placeholder="Ex.: Oferta de outubro">
 <label>Empresa</label><select name="profile"><option value="4k">4K Food Service</option><option value="digital">Presença Digital</option></select>
