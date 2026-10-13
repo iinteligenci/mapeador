@@ -36,19 +36,20 @@ h1{font-size:28px;line-height:1.15;margin:0} .sub{color:var(--muted);margin:5px 
 h2{font-size:18px;margin:0 0 16px}.formgrid{display:grid;grid-template-columns:minmax(220px,2fr) minmax(140px,1fr) minmax(220px,1.5fr);gap:14px}
 label{display:block;color:var(--muted);font-size:13px;margin-bottom:6px}input,select{width:100%;border:1px solid #354761;background:#0c1627;color:var(--text);border-radius:10px;padding:12px;font:inherit}
 button{border:0;border-radius:10px;padding:12px 18px;background:var(--blue);color:#071321;font-weight:750;cursor:pointer;margin-top:16px}button:disabled{opacity:.6;cursor:wait}
-.note{font-size:12px;color:var(--muted);margin-top:12px}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.stat{background:#0d1829;border:1px solid var(--line);border-radius:12px;padding:14px}.stat strong{display:block;font-size:24px}.stat span{font-size:12px;color:var(--muted)}
+.note{font-size:12px;color:var(--muted);margin-top:12px}.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.stat{background:#0d1829;border:1px solid var(--line);border-radius:12px;padding:14px}.stat strong{display:block;font-size:24px}.stat span{font-size:12px;color:var(--muted)}
 .alert{border-radius:12px;padding:13px 15px;margin:14px 0;background:#392b14;border:1px solid #79551e;color:#ffdda0}.success{background:#102e2a;border-color:#236d5c;color:#a9f3d9}
 .results{display:grid;gap:14px}.lead{border:1px solid var(--line);background:#0d1829;border-radius:14px;padding:18px}.leadhead{display:flex;justify-content:space-between;gap:16px;align-items:start}.lead h3{margin:0 0 4px;font-size:18px}.category{color:var(--muted);font-size:13px}.score{white-space:nowrap;border-radius:99px;padding:5px 10px;background:#123a35;color:#83f0ce;font-weight:700;font-size:13px}.score.unknown{background:#302a1d;color:#ffdb91}
 .details{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:15px}.detail{border-top:1px solid #26354d;padding-top:9px;min-width:0}.detail b{display:block;color:var(--muted);font-size:12px;font-weight:500}.detail a{color:#83c5ff;overflow-wrap:anywhere}.detail div{overflow-wrap:anywhere}
 .analysis{margin-top:15px;padding:13px;border-radius:10px;background:#14243a}.analysis b{font-size:13px}.analysis p{margin:5px 0}.draft{margin-top:10px;padding:12px;border-left:3px solid var(--blue);background:#101e31;white-space:pre-wrap}
 .statusform{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}.statusform select{max-width:220px}.statusform button{margin:0;padding:10px 13px}.nav{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0}.nav a{color:#b9dcff;text-decoration:none;border:1px solid #354761;background:#122039;padding:9px 13px;border-radius:10px}.nav a:hover{border-color:var(--blue)}.empty{color:var(--muted);padding:18px 0}.footer{font-size:12px;color:var(--muted);text-align:center;margin-top:24px}
-@media(max-width:720px){main{padding:22px 14px}.formgrid,.stats,.details{grid-template-columns:1fr}h1{font-size:24px}.leadhead{flex-direction:column}.score{align-self:start}}
+@media(max-width:900px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}\n@media(max-width:720px){main{padding:22px 14px}.formgrid,.stats,.details{grid-template-columns:1fr}h1{font-size:24px}.leadhead{flex-direction:column}.score{align-self:start}}
 </style>
 </head>
 <body><main>
 <header>
  <div class="brand"><div class="mark">M</div><div><h1>Mapeador</h1><div class="category">Inteligência comercial para negócios alimentícios</div></div></div>
- <p class="sub">Encontre estabelecimentos, investigue sua presença digital e organize oportunidades para revisão humana.</p>\n <nav class="nav"><a href="/">＋ Nova prospecção</a><a href="/history">▤ Restaurantes já pesquisados</a></nav>
+ <p class="sub">Encontre estabelecimentos, investigue sua presença digital e organize oportunidades para revisão humana.</p>
+ <nav class="nav"><a href="/">＋ Nova prospecção</a><a href="/history">▤ Restaurantes já pesquisados</a></nav>
 </header>
 <section class="panel">
  <h2>Nova prospecção</h2>
@@ -74,7 +75,8 @@ button{border:0;border-radius:10px;padding:12px 18px;background:var(--blue);colo
  <div class="stats">
   <div class="stat"><strong>{{ results|length }}</strong><span>Estabelecimentos encontrados</span></div>
   <div class="stat"><strong>{{ analyzed }}</strong><span>Análises de IA concluídas</span></div>
-  <div class="stat"><strong>{{ failed }}</strong><span>Análises pendentes ou com erro</span></div>\n  <div class="stat"><strong>{{ skipped }}</strong><span>Já pesquisados — ignorados</span></div>
+  <div class="stat"><strong>{{ failed }}</strong><span>Análises pendentes ou com erro</span></div>
+  <div class="stat"><strong>{{ skipped }}</strong><span>Já pesquisados — ignorados</span></div>
  </div>
  {% if results|length == 0 %}<p class="empty">{% if skipped %}Todos os estabelecimentos encontrados já estavam cadastrados. Não repetimos a análise. Confira a aba “Restaurantes já pesquisados”.{% else %}Nenhum estabelecimento novo retornado. Tente outro termo ou localidade.{% endif %}</p>{% else %}
  <div class="results" style="margin-top:16px">
@@ -211,12 +213,16 @@ def search():
             if lead_id is not None:
                 combined = {
                     "score": max(item["score"] for item in analyses.values()),
-                    "justificativa": "\n".join(
+                    "justificativa": "
+".join(
                         f"{'4K Food Service' if key == '4k' else 'Presença digital'}: {item['justificativa']}"
                         for key, item in analyses.items()
                     ),
-                    "mensagem": "\n\n".join(
-                        f"{'4K Food Service' if key == '4k' else 'Presença digital'} — rascunho não enviado:\n{item['mensagem']}"
+                    "mensagem": "
+
+".join(
+                        f"{'4K Food Service' if key == '4k' else 'Presença digital'} — rascunho não enviado:
+{item['mensagem']}"
                         for key, item in analyses.items()
                     ),
                 }
