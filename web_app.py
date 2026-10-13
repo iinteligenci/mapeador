@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 from flask import Flask, redirect, render_template_string, request, url_for
 
 from ai_agent.analyzer import analyze_lead_profiles
+from ai_agent.research_planner import plan_deep_searches
 from database.db import (get_leads, init_db, save_lead, update_analysis, update_lead_status, update_public_contacts, update_business_identity, save_campaign, get_campaigns, queue_campaign, get_campaign_leads, update_campaign_event, get_automation_settings, set_automation_settings, save_proposal, get_proposals)
 from scraper.maps_scraper import search_google_maps
 from scraper.public_contacts import find_public_business_contacts
@@ -610,13 +611,29 @@ def _background_research_loop() -> None:
                 records = get_leads(path=db_path)
                 known_links = {str(item.get("link") or "").split("?")[0].rstrip("/") for item in records}
                 try:
-                    found = asyncio.run(search_google_maps(
-                        settings.get("search_term") or "restaurantes em Vila Velha ES",
-                        int(settings.get("batch_size") or 3), exclude_links=known_links))
-                    for new_lead in found:
-                        save_lead(new_lead, db_path)
+                    base_term = settings.get("search_term") or "restaurantes em Vila Velha ES"
+                    batch_size = int(settings.get("batch_size") or 3)
+                    # Gemini plans several targeted search formulations; each result is still verified by Maps.
+                    search_queries = plan_deep_searches(base_term, limit=4)
+                    found_count = 0
+                    for query in search_queries:
+                        if found_count >= batch_size:
+                            break
+                        try:
+                            found = asyncio.run(search_google_maps(
+                                query, max(1, batch_size - found_count), exclude_links=known_links))
+                            for new_lead in found:
+                                lead_id, inserted = save_lead(new_lead, db_path)
+                                normalized = str(new_lead.get("link") or "").split("?")[0].rstrip("/")
+                                known_links.add(normalized)
+                                if inserted:
+                                    found_count += 1
+                                if found_count >= batch_size:
+                                    break
+                        except Exception as query_exc:
+                            print(f"Mapeador automático — consulta '{query}': {type(query_exc).__name__}: {query_exc}")
                 except Exception as exc:
-                    print(f"Mapeador automático — pesquisa: {type(exc).__name__}: {exc}")
+                    print(f"Mapeador automático — pesquisa aprofundada: {type(exc).__name__}: {exc}")
 
                 # Refresh records after discovery; process a small batch each cycle to limit load.
                 records = get_leads(path=db_path)
