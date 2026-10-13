@@ -30,14 +30,14 @@ python -m playwright install chromium
 Copy-Item .env.example .env
 ```
 
-3. Abra o arquivo `.env` e configure sua chave do Gemini.
+3. Abra o arquivo `.env` e configure sua chave da Gemini API. Você pode criar/gerenciar a chave pelo Google AI Studio.
 4. Execute, por exemplo:
 
 ```powershell
-python main.py --termo "restaurantes em Vila Velha ES" --limite 10
+python main.py --termo "restaurantes em Vila Velha ES" --limite 5
 ```
 
-O relatório será salvo em `reports/` no formato Markdown.
+O relatório será salvo em `reports/` no formato Markdown. O banco SQLite fica em `data/`.
 
 Se a ativação do ambiente for bloqueada, use `.venv\Scripts\python.exe` no lugar de `python`.
 
@@ -52,7 +52,7 @@ pip install -r requirements.txt
 python -m playwright install chromium
 cp .env.example .env
 # Configure GEMINI_API_KEY no .env
-python main.py --termo "restaurantes em Vila Velha ES" --limite 10
+python main.py --termo "restaurantes em Vila Velha ES" --limite 5
 ```
 
 ## Configuração
@@ -61,18 +61,18 @@ O arquivo local `.env` deve conter:
 
 ```dotenv
 GEMINI_API_KEY=sua_chave_real
-GEMINI_MODEL=gemini-2.0-flash
+GEMINI_MODEL=gemini-3.8-flash
 DATABASE_PATH=data/mapeador.sqlite3
 ```
 
-Nunca publique o arquivo `.env` nem compartilhe a chave.
+Nunca publique o arquivo `.env` nem compartilhe a chave. O projeto usa o SDK atual `google-genai`, recomendado pelo Google, em vez do SDK legado `google-generativeai`.
 
 ## Limitações e uso responsável
 
 - Os seletores do Google Maps podem mudar; telefone/endereço/site podem não estar disponíveis.
-- O site é consultado apenas em páginas públicas, sem login ou tentativa de contornar CAPTCHA, bloqueios ou limites.
+- A coleta do Maps e a consulta de sites são experimentais. Não há tentativa de contornar CAPTCHA, login, bloqueios ou limites.
 - Para uso comercial contínuo, considere a Google Maps Platform Places API e siga seus termos e cotas.
+- A pesquisa de canais e ferramentas limita-se às páginas públicas examinadas; não confirma sistemas internos de gestão.
 - Itens do cardápio são extraídos de textos visíveis, não de imagens/PDFs; confirme no link de origem.
-- A existência de ferramenta interna de gestão de vendas só pode ser confirmada se houver evidência pública. Ausência de evidência não é prova de ausência.
 - A qualificação por IA é uma hipótese para revisão humana. Mensagens comerciais ficam como rascunhos; nada é enviado automaticamente.
 - Respeite a LGPD, os termos das plataformas e pedidos para não receber contato.
