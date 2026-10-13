@@ -1,14 +1,13 @@
-"""Coleta básica de resultados públicos do Google Maps usando Playwright.
+"""Coleta experimental de informações comerciais públicas do Google Maps.
 
-Observação: seletores e estrutura do Google Maps mudam com frequência. Para uso
-comercial em escala, prefira a Google Maps Platform Places API e respeite os
-termos de uso, robots/restrições aplicáveis e limites de requisição.
+O Google pode alterar a página e os seletores. Não contorna CAPTCHA, login,
+bloqueios ou controles de acesso. Para produção, avalie a Google Maps Platform
+Places API e respeite os termos aplicáveis.
 """
 from __future__ import annotations
 
-import asyncio
 import logging
-from typing import Any
+import re
 from urllib.parse import quote_plus
 
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
@@ -17,94 +16,112 @@ from playwright.async_api import async_playwright
 logger = logging.getLogger(__name__)
 
 
-async def search_google_maps(term: str, limit: int = 10) -> list[dict[str, str]]:
-    """Pesquisa um termo no Maps e retorna até *limit* leads.
+def _clean(value: str | None) -> str:
+    return re.sub(r"\s+", " ", value or "").strip()
 
-    Cada lead contém name, link e category. A função não tenta contornar CAPTCHA,
-    login, bloqueios ou outras medidas de acesso.
+
+async def search_google_maps(term: str, limit: int = 10) -> list[dict[str, str]]:
+    """Pesquisa empresas e tenta extrair nome, categoria, telefone e site.
+
+    A extração de telefone/site abre cada resultado para ler o painel de detalhes.
+    Retorna dicionários com name, category, link, phone e website.
     """
-    if not term or not term.strip():
+    term = _clean(term)
+    if not term:
         raise ValueError("O termo de pesquisa não pode estar vazio.")
     if limit < 1:
         raise ValueError("O limite deve ser maior que zero.")
 
     results: list[dict[str, str]] = []
-    seen_links: set[str] = set()
-    url = f"https://www.google.com/maps/search/{quote_plus(term.strip())}"
+    seen: set[str] = set()
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
-        context = await browser.new_context(
-            locale="pt-BR",
-            viewport={"width": 1365, "height": 900},
-            user_agent=(
-                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-                "(KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
-            ),
-        )
+        context = await browser.new_context(locale="pt-BR", viewport={"width": 1365, "height": 900})
         page = await context.new_page()
         try:
-            await page.goto(url, wait_until="domcontentloaded", timeout=60000)
+            await page.goto(
+                f"https://www.google.com/maps/search/{quote_plus(term)}",
+                wait_until="domcontentloaded",
+                timeout=60000,
+            )
+            feed = page.locator('div[role="feed"]')
             try:
-                await page.locator('div[role="feed"]').wait_for(timeout=15000)
+                await feed.wait_for(timeout=15000)
             except PlaywrightTimeoutError:
-                logger.warning("A lista de resultados não apareceu; o Maps pode ter bloqueado ou mudado.")
+                logger.warning("Lista de resultados indisponível. O Maps pode ter mudado ou limitado o acesso.")
                 return []
 
-            feed = page.locator('div[role="feed"]')
-            previous_count = -1
-            # Rola a lista com limite de tentativas para não ficar presa em loop.
-            for _ in range(min(limit * 2, 20)):
-                cards = await feed.locator('div[role="article"]').all()
-                if len(cards) >= limit or len(cards) == previous_count:
+            previous = -1
+            for _ in range(min(20, max(4, limit * 2))):
+                cards = await feed.locator('div[role="article"]').count()
+                if cards >= limit or cards == previous:
                     break
-                previous_count = len(cards)
+                previous = cards
                 await feed.evaluate("(el) => el.scrollBy(0, el.clientHeight)")
-                await page.wait_for_timeout(900)
+                await page.wait_for_timeout(800)
 
             cards = await feed.locator('div[role="article"]').all()
             for card in cards:
                 if len(results) >= limit:
                     break
                 try:
-                    link_el = card.locator('a[href*="/maps/place/"]').first
-                    link = await link_el.get_attribute("href", timeout=2000)
-                    name = (await link_el.get_attribute("aria-label", timeout=2000) or "").strip()
-                    if not name:
-                        name = (await card.inner_text(timeout=2000)).splitlines()[0].strip()
+                    anchor = card.locator('a[href*="/maps/place/"]').first
+                    link = _clean(await anchor.get_attribute("href", timeout=2500))
+                    name = _clean(await anchor.get_attribute("aria-label", timeout=2500))
+                    lines = [ _clean(x) for x in (await card.inner_text(timeout=2500)).splitlines() if _clean(x) ]
+                    if not name and lines:
+                        name = lines[0]
                     if not link or not name:
                         continue
                     if link.startswith("/"):
                         link = "https://www.google.com" + link
-                    if link in seen_links:
+                    if link in seen:
                         continue
-                    seen_links.add(link)
+                    seen.add(link)
 
-                    lines = [line.strip() for line in (await card.inner_text(timeout=2000)).splitlines() if line.strip()]
                     category = ""
                     for line in lines[1:]:
-                        # Heurística simples: primeira linha curta que não parece avaliação/horário/endereço.
-                        lowered = line.lower()
-                        if (
-                            line != name
-                            and len(line) <= 80
-                            and not any(token in lowered for token in ("★", "estrelas", "aberto", "fechado", "km", " R$", "avaliaç"))
-                        ):
+                        low = line.lower()
+                        if (len(line) <= 90 and not any(x in low for x in (
+                            "★", "estrelas", "avaliaç", "aberto", "fechado", " km", "min",
+                            " R$", "·", "visualizações"
+                        ))):
                             category = line
                             break
-                    results.append({"name": name, "link": link, "category": category or "Não identificada"})
-                except (PlaywrightTimeoutError, Exception) as exc:
-                    logger.debug("Resultado ignorado durante a extração: %s", exc)
+
+                    lead = {"name": name, "category": category or "Não identificada",
+                            "link": link, "phone": "", "website": ""}
+                    # Abrir o cartão para tentar ler os campos do painel de detalhes.
+                    await anchor.click(timeout=3000)
+                    await page.wait_for_timeout(700)
+                    try:
+                        phone_button = page.locator('button[data-item-id^="phone:tel:"]').first
+                        if await phone_button.count():
+                            label = await phone_button.get_attribute("aria-label")
+                            lead["phone"] = _clean(label).replace("Telefone:", "").replace("Phone:", "")
+                    except Exception as exc:
+                        logger.debug("Telefone não disponível para %s: %s", name, exc)
+                    try:
+                        website_link = page.locator('a[data-item-id="authority"]').first
+                        if await website_link.count():
+                            lead["website"] = _clean(await website_link.get_attribute("href"))
+                    except Exception as exc:
+                        logger.debug("Site não disponível para %s: %s", name, exc)
+
+                    results.append(lead)
+                    # Voltar à lista de resultados, quando possível.
+                    try:
+                        await page.go_back(wait_until="domcontentloaded", timeout=8000)
+                        await feed.wait_for(timeout=5000)
+                    except Exception:
+                        # O próximo cartão ainda pode ser clicável; a estrutura varia conforme o Maps.
+                        logger.debug("Não foi possível voltar à lista após %s", name)
+                except Exception as exc:
+                    logger.debug("Resultado ignorado: %s", exc)
                     continue
         finally:
             await context.close()
             await browser.close()
 
     return results[:limit]
-
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    found = asyncio.run(search_google_maps("restaurantes em Vitória ES", 5))
-    for item in found:
-        print(item)
