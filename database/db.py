@@ -208,7 +208,7 @@ def queue_campaign(campaign_id: int, lead_ids: list[int], path: str | None = Non
                    SELECT ?, ? WHERE NOT EXISTS (
                      SELECT 1 FROM campaign_events WHERE lead_id=? AND status='opted_out'
                    ) AND NOT EXISTS (
-                     SELECT 1 FROM leads WHERE id=? AND status='in_person'
+                     SELECT 1 FROM leads WHERE id=? AND status IN ('in_person', 'removed')
                    )""",
                 (campaign_id, lead_id, lead_id, lead_id),
             )
@@ -220,7 +220,7 @@ def get_campaign_leads(campaign_id: int, path: str | None = None) -> list[dict[s
         rows = conn.execute("""
             SELECT l.*, e.status AS campaign_status, e.consent_confirmed
             FROM campaign_events e JOIN leads l ON l.id=e.lead_id
-            WHERE e.campaign_id=? AND l.status <> 'in_person' ORDER BY l.name
+            WHERE e.campaign_id=? AND l.status NOT IN ('in_person', 'removed') ORDER BY l.name
         """, (campaign_id,))
         return [dict(row) for row in rows]
 
@@ -251,7 +251,7 @@ def get_leads(status: str | None = None, path: str | None = None) -> list[dict[s
 
 def update_lead_status(lead_id: int, status: str, path: str | None = None) -> None:
     """Atualiza o estágio comercial de um estabelecimento."""
-    allowed = {"to_visit", "visited", "client", "in_person"}
+    allowed = {"to_visit", "visited", "client", "in_person", "removed"}
     if status not in allowed:
         raise ValueError("Status inválido.")
     init_db(path)
