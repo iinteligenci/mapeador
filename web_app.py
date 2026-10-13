@@ -169,7 +169,8 @@ def search():
     db_path = os.getenv("DATABASE_PATH", "data/mapeador.sqlite3")
     init_db(db_path)
     try:
-        leads = asyncio.run(search_google_maps(term, limit))
+        known_links = {str(item.get("link") or "").split("?")[0].rstrip("/") for item in get_leads(path=db_path)}
+        leads = asyncio.run(search_google_maps(term, limit, exclude_links=known_links))
     except Exception as exc:
         return render_template_string(
             PAGE, term=term, limit=limit, offer=offer, profile=profile, reanalyze=reanalyze, results=[],
