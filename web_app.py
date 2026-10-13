@@ -211,12 +211,12 @@ def search():
             if lead_id is not None:
                 combined = {
                     "score": max(item["score"] for item in analyses.values()),
-                    "justificativa": "\\n".join(
+                    "justificativa": "\n".join(
                         f"{'4K Food Service' if key == '4k' else 'Presença digital'}: {item['justificativa']}"
                         for key, item in analyses.items()
                     ),
-                    "mensagem": "\\n\\n".join(
-                        f"{'4K Food Service' if key == '4k' else 'Presença digital'} — rascunho não enviado:\\n{item['mensagem']}"
+                    "mensagem": "\n\n".join(
+                        f"{'4K Food Service' if key == '4k' else 'Presença digital'} — rascunho não enviado:\n{item['mensagem']}"
                         for key, item in analyses.items()
                     ),
                 }
