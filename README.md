@@ -1,69 +1,93 @@
 # Mapeador — Agente de Prospecção com Google Maps e IA
 
-Base inicial em Python para pesquisar empresas, organizar informações públicas e preparar mensagens comerciais personalizadas com Gemini. O módulo de envio é **somente uma simulação**: nenhuma mensagem é enviada.
+Aplicação Python que tenta coletar dados comerciais públicos, evita duplicados em SQLite e usa Gemini para sugerir uma qualificação e uma mensagem B2B. O módulo de contato **apenas exibe rascunhos**: não envia WhatsApp, e-mail ou SMS.
 
-## Arquitetura
+## Estrutura
 
-- `scraper/maps_scraper.py`: pesquisa um termo no Google Maps com Playwright e tenta extrair nome, link e categoria.
-- `ai_agent/analyzer.py`: usa o Gemini para criar um rascunho de abordagem B2B.
-- `outreach/sender.py`: exibe a mensagem e marca a ação como simulada.
-- `main.py`: coordena pesquisa, geração e exibição dos resultados.
+- `scraper/maps_scraper.py`: busca no Google Maps com Playwright; tenta extrair nome, categoria, telefone e site.
+- `database/db.py`: banco SQLite local e deduplicação por link do local.
+- `ai_agent/analyzer.py`: qualificação estimada e mensagem com Gemini.
+- `outreach/sender.py`: exibe rascunhos para revisão humana.
+- `main.py`: conecta os módulos.
+- `data/mapeador.sqlite3`: criado automaticamente na primeira execução.
 
-## Requisitos
+## Instalação para iniciantes (Windows)
 
-- Python 3.10 ou superior
-- Chave de API do Gemini, obtida no Google AI Studio
-- Chromium instalado pelo Playwright
-
-## Instalação
-
-Linux/macOS:
-
-```bash
-git clone https://github.com/iinteligenci/mapeador.git
-cd mapeador
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python -m playwright install chromium
-cp .env.example .env
-```
-
-Windows PowerShell:
+1. Instale Python 3.11 ou 3.12 a partir do site oficial do Python. Durante a instalação, marque **Add Python to PATH**.
+2. Instale Git, caso ainda não tenha.
+3. Abra o PowerShell (menu Iniciar → escreva PowerShell).
+4. Copie e execute, uma linha de cada vez:
 
 ```powershell
 git clone https://github.com/iinteligenci/mapeador.git
 cd mapeador
 py -m venv .venv
 .venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
 pip install -r requirements.txt
 python -m playwright install chromium
 Copy-Item .env.example .env
 ```
 
-Edite o arquivo `.env` e substitua `cole_sua_chave_aqui` por sua chave real. **Nunca publique o arquivo `.env` nem inclua a chave no código ou no GitHub.**
+5. Abra a pasta `mapeador` no Explorador de Arquivos. Abra o arquivo `.env` com o Bloco de Notas e substitua `cole_sua_chave_aqui` pela sua chave real do Gemini. Salve.
+6. No PowerShell, execute:
 
-## Executar
-
-```bash
-python main.py --termo "pizzarias em Vila Velha ES" --limite 10 --oferta "apresentar nosso serviço de presença digital"
+```powershell
+python main.py --termo "restaurantes em Vila Velha ES" --limite 5 --oferta "serviços de presença digital"
 ```
 
-Opções disponíveis:
+Na primeira execução, o programa cria a pasta `data` e o banco SQLite. O resultado aparece no terminal. Mensagens são rascunhos e exigem revisão humana.
 
-- `--termo`: pesquisa a ser feita (padrão: restaurantes em Vitória ES).
-- `--limite`: máximo de empresas a processar (padrão: 5).
-- `--oferta`: contexto da abordagem comercial.
-- `--verbose`: logs detalhados.
+### Se o PowerShell bloquear a ativação do ambiente
+
+Pode executar diretamente sem ativar o ambiente, usando:
+
+```powershell
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+.venv\Scripts\python.exe -m playwright install chromium
+.venv\Scripts\python.exe main.py --termo "restaurantes em Vila Velha ES" --limite 5
+```
+
+## macOS/Linux
+
+```bash
+git clone https://github.com/iinteligenci/mapeador.git
+cd mapeador
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+python -m playwright install chromium
+cp .env.example .env
+# Edite .env e configure GEMINI_API_KEY
+python main.py --termo "restaurantes em Vila Velha ES" --limite 5
+```
+
+## Configuração
+
+O arquivo local `.env` deve conter:
+
+```dotenv
+GEMINI_API_KEY=sua_chave_real
+GEMINI_MODEL=gemini-2.0-flash
+DATABASE_PATH=data/mapeador.sqlite3
+```
+
+Obtenha a chave no Google AI Studio. **Não publique `.env` nem compartilhe a chave.** O repositório inclui apenas `.env.example`.
+
+## Banco de dados
+
+Cada lead é identificado principalmente pelo link do local no Maps. Ao reencontrar o mesmo link, o banco atualiza campos disponíveis sem criar uma segunda linha. A análise mais recente e o rascunho também ficam associados ao registro.
 
 ## Limitações e uso responsável
 
-A estrutura e os seletores do Google Maps podem mudar; resultados podem vir vazios ou incompletos. O projeto não tenta contornar CAPTCHA, login ou bloqueios. Antes de automatizar coleta em produção, confira os termos e políticas aplicáveis do Google. Para aplicações comerciais robustas, considere a Google Maps Platform Places API, respeitando suas condições e cotas.
+- Os seletores do Google Maps podem mudar; telefone/site podem não estar disponíveis e os resultados podem ficar incompletos.
+- Não há tentativa de contornar CAPTCHA, login, bloqueios ou limites. Para uso comercial contínuo, avalie a Google Maps Platform Places API e siga os seus termos e cotas.
+- O score é uma estimativa gerada por IA com base nos poucos dados coletados, não uma verificação objetiva da qualidade da empresa.
+- Revise a mensagem antes de entrar em contato. Respeite privacidade, LGPD, regras de contato comercial e pedidos de não contato. Não há disparo automático neste projeto.
 
-Revise todas as mensagens antes de usá-las. Faça contato apenas quando houver base legal e expectativa razoável de pertinência, respeite pedidos de não contato e as regras aplicáveis de privacidade e proteção de dados (incluindo a LGPD). Este projeto não implementa disparo de mensagens, enriquecimento de dados pessoais ou envio automático.
+## Diagnóstico
 
-## Segurança
-
-- `.env` contém segredos locais e não deve ser commitado.
-- As mensagens geradas são sugestões, não afirmações verificadas sobre a empresa.
-- A integração com Gemini pode gerar custos e está sujeita aos limites da sua conta.
+- `GEMINI_API_KEY` ausente: verifique se criou e editou o arquivo `.env` na pasta `mapeador`.
+- Chromium ausente: execute `python -m playwright install chromium`.
+- Nenhum resultado: teste outro termo, rode com `--verbose` e considere mudanças na página do Maps.
