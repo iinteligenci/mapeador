@@ -68,12 +68,7 @@ button{border:0;border-radius:10px;padding:12px 18px;background:var(--blue);colo
 {% if results is not none %}
 <section class="panel">
  <h2>Estabelecimentos encontrados</h2>
- <div class="stats">
-  <div class="stat"><strong>{{ results|length }}</strong><span>Estabelecimentos encontrados</span></div>
-  <div class="stat"><strong>{{ analyzed }}</strong><span>Análises de IA concluídas</span></div>
-  <div class="stat"><strong>{{ failed }}</strong><span>Análises pendentes ou com erro</span></div>
-  <div class="stat"><strong>{{ skipped }}</strong><span>Já pesquisados — ignorados</span></div>
- </div>
+ <div class="stat" style="max-width:360px"><strong>{{ results|length }}</strong><span>Novos estabelecimentos adicionados ao histórico</span></div>
  {% if results|length == 0 %}<p class="empty">Não encontrei novos estabelecimentos nessa consulta. Os resultados anteriores são ignorados automaticamente; tente ampliar a região ou mudar o termo para encontrar outros negócios alimentícios.</p>{% else %}
  <div class="results" style="margin-top:16px">
  {% for item in results %}
@@ -338,7 +333,7 @@ main{max-width:1180px;margin:auto;padding:34px 22px 64px}.brand{display:flex;gap
 <a href="/history?status=visited" class="{{ 'active' if selected == 'visited' else '' }}">Visitados</a>
 <a href="/history?status=client" class="{{ 'active' if selected == 'client' else '' }}">Clientes</a>
 </div>
-{% if not leads %}<div class="empty">Nenhum restaurante nesta categoria ainda. Faça uma prospecção para adicionar empresas ao histórico.</div>{% endif %}
+{% if not leads %}<div class="empty">Nenhum estabelecimento nesta categoria ainda. Faça uma busca para adicionar negócios ao histórico.</div>{% endif %}
 {% for lead in leads %}<article class="entry">
 <div class="top"><div><h3>{{ lead.name }}</h3><div class="muted">{{ lead.category or "Categoria não identificada" }}</div></div><span class="pill">{{ lead.status_label }}</span></div>
 <div class="meta">
@@ -348,14 +343,20 @@ main{max-width:1180px;margin:auto;padding:34px 22px 64px}.brand{display:flex;gap
 <div><b>Última atualização</b>{{ lead.updated_at }}</div>
 <div><b>Análise</b>{{ lead.justification or "Análise não registrada" }}</div>
 </div>
-{% if lead.message %}<details><summary>Ver rascunho de abordagem (não enviado)</summary><p style="white-space:pre-wrap">{{ lead.message }}</p></details>{% endif %}
+{% if lead.message %}<details><summary>Ver última proposta gerada (não enviada)</summary><p style="white-space:pre-wrap">{{ lead.message }}</p></details>{% endif %}
 {% if lead.link %}<p><a href="{{lead.link}}" target="_blank" rel="noopener">Abrir no Google Maps ↗</a></p>{% endif %}
+<form class="statusform" method="post" action="/proposal">
+<input type="hidden" name="lead_id" value="{{lead.id}}"><input type="hidden" name="term" value="Estabelecimento do histórico"><input type="hidden" name="limit" value="3">
+<label for="history-proposal-{{lead.id}}" class="muted">Gerar proposta para:</label>
+<select id="history-proposal-{{lead.id}}" name="proposal_profile"><option value="4k">4K Food Service</option><option value="digital">Presença digital</option><option value="both">Ambas as empresas</option></select>
+<input name="proposal_offer" placeholder="Oferta personalizada (opcional)" style="max-width:260px">
+<button type="submit">Gerar proposta</button></form>
 <form class="statusform" method="post" action="/status"><input type="hidden" name="lead_id" value="{{lead.id}}">
 <label for="history-status-{{lead.id}}" class="muted">Alterar etapa:</label>
 <select id="history-status-{{lead.id}}" name="status">{% for value,label in labels.items() %}<option value="{{value}}" {% if lead.status == value %}selected{% endif %}>{{label}}</option>{% endfor %}</select>
 <button type="submit">Salvar</button></form>
 </article>{% endfor %}
-<p class="hint">Uma empresa já cadastrada será ignorada nas próximas análises para reduzir repetição e chamadas à IA. O histórico fica neste computador, no banco SQLite local.</p>
+<p class="hint">A busca ignora estabelecimentos já encontrados. Para criar uma mensagem, escolha a empresa e clique em “Gerar proposta”. O histórico fica neste computador, no banco SQLite local.</p>
 </section></main></body></html>
 """
 
