@@ -17,11 +17,11 @@ logger = logging.getLogger(__name__)
 
 
 def _clean(value: str | None) -> str:
-    return re.sub(r"\\s+", " ", value or "").strip()
+    return re.sub(r"\s+", " ", value or "").strip()
 
 
 async def search_google_maps(term: str, limit: int = 10) -> list[dict[str, str]]:
-    """Retorna até *limit* leads com nome, categoria, link, telefone e site."""
+    """Retorna leads com nome, categoria, link, telefone, endereço e site quando disponíveis."""
     term = _clean(term)
     if not term:
         raise ValueError("O termo de pesquisa não pode estar vazio.")
@@ -34,10 +34,8 @@ async def search_google_maps(term: str, limit: int = 10) -> list[dict[str, str]]
         context = await browser.new_context(locale="pt-BR", viewport={"width": 1365, "height": 900})
         page = await context.new_page()
         try:
-            await page.goto(
-                f"https://www.google.com/maps/search/{quote_plus(term)}",
-                wait_until="domcontentloaded", timeout=60000,
-            )
+            await page.goto(f"https://www.google.com/maps/search/{quote_plus(term)}",
+                            wait_until="domcontentloaded", timeout=60000)
             feed = page.locator('div[role="feed"]')
             try:
                 await feed.wait_for(timeout=15000)
@@ -54,7 +52,6 @@ async def search_google_maps(term: str, limit: int = 10) -> list[dict[str, str]]
                 await feed.evaluate("(el) => el.scrollBy(0, el.clientHeight)")
                 await page.wait_for_timeout(800)
 
-            # Capturar os dados dos cartões antes de navegar para páginas de detalhes.
             cards = await feed.locator('div[role="article"]').all()
             candidates: list[dict[str, str]] = []
             seen: set[str] = set()
@@ -86,7 +83,7 @@ async def search_google_maps(term: str, limit: int = 10) -> list[dict[str, str]]
                             break
                     candidates.append({
                         "name": name, "category": category or "Não identificada",
-                        "link": link, "phone": "", "website": "",
+                        "link": link, "phone": "", "address": "", "website": "",
                     })
                 except Exception as exc:
                     logger.debug("Cartão ignorado: %s", exc)
@@ -94,14 +91,17 @@ async def search_google_maps(term: str, limit: int = 10) -> list[dict[str, str]]
             for lead in candidates:
                 try:
                     await page.goto(lead["link"], wait_until="domcontentloaded", timeout=30000)
-                    try:
-                        await page.locator('button[data-item-id^="phone:tel:"]').first.wait_for(timeout=2500)
-                    except PlaywrightTimeoutError:
-                        pass
-                    phone_button = page.locator('button[data-item-id^="phone:tel:"]').first
-                    if await phone_button.count():
-                        label = _clean(await phone_button.get_attribute("aria-label"))
-                        lead["phone"] = label.replace("Telefone:", "").replace("Phone:", "").strip()
+                    for selector, field in [
+                        ('button[data-item-id^="phone:tel:"]', "phone"),
+                        ('button[data-item-id="address"]', "address"),
+                    ]:
+                        element = page.locator(selector).first
+                        if await element.count():
+                            label = _clean(await element.get_attribute("aria-label"))
+                            if field == "phone":
+                                lead[field] = label.replace("Telefone:", "").replace("Phone:", "").strip()
+                            else:
+                                lead[field] = label.replace("Endereço:", "").replace("Address:", "").strip()
                     website_link = page.locator('a[data-item-id="authority"]').first
                     if await website_link.count():
                         lead["website"] = _clean(await website_link.get_attribute("href"))
@@ -111,5 +111,4 @@ async def search_google_maps(term: str, limit: int = 10) -> list[dict[str, str]]
         finally:
             await context.close()
             await browser.close()
-
     return results[:limit]
