@@ -170,14 +170,16 @@ def search():
     results: list[dict[str, Any]] = []
     analyzed = 0
     skipped = 0
+    saved_by_link = {item.get("link"): item for item in get_leads(path=db_path)}
     for lead in leads:
         try:
             lead_id, inserted = save_lead(lead, db_path)
         except Exception:
             lead_id, inserted = None, True
 
-        # Existing records are not researched or sent to Gemini again.
-        if not inserted:
+        # Skip completed leads; allow retry when the previous AI call failed.
+        existing = saved_by_link.get(lead.get("link"))
+        if not inserted and existing and existing.get("score") is not None:
             skipped += 1
             continue
 
