@@ -178,15 +178,25 @@ def update_public_contacts(lead_id: int, contacts: dict[str, Any], path: str | N
     values = [str(contacts.get(field) or "").strip() for field in fields]
     notes = " ".join(str(note).strip() for note in contacts.get("contact_notes", []) if str(note).strip())
     with _connect(path) as conn:
+        emails = ", ".join(contacts.get("contact_emails", []))
+        phones = ", ".join(contacts.get("contact_phones", []))
+        whatsapps = ", ".join(contacts.get("contact_whatsapps", []))
         conn.execute(
-            """UPDATE leads SET contact_name=?, contact_role=?, contact_phone=?,
-               contact_whatsapp=?, contact_source=?, contact_confidence=?,
-               contact_notes=?, contact_emails=?, contact_phones=?, contact_whatsapps=?,
+            """UPDATE leads SET
+               contact_name=CASE WHEN ? <> '' THEN ? ELSE contact_name END,
+               contact_role=CASE WHEN ? <> '' THEN ? ELSE contact_role END,
+               contact_phone=CASE WHEN ? <> '' THEN ? ELSE contact_phone END,
+               contact_whatsapp=CASE WHEN ? <> '' THEN ? ELSE contact_whatsapp END,
+               contact_source=CASE WHEN ? <> '' THEN ? ELSE contact_source END,
+               contact_confidence=CASE WHEN ? <> '' THEN ? ELSE contact_confidence END,
+               contact_notes=CASE WHEN ? <> '' THEN ? ELSE contact_notes END,
+               contact_emails=CASE WHEN ? <> '' THEN ? ELSE contact_emails END,
+               contact_phones=CASE WHEN ? <> '' THEN ? ELSE contact_phones END,
+               contact_whatsapps=CASE WHEN ? <> '' THEN ? ELSE contact_whatsapps END,
                contact_checked_at=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP WHERE id=?""",
-            (*values, notes,
-             ", ".join(contacts.get("contact_emails", [])),
-             ", ".join(contacts.get("contact_phones", [])),
-             ", ".join(contacts.get("contact_whatsapps", [])), lead_id),
+            (values[0], values[0], values[1], values[1], values[2], values[2],
+             values[3], values[3], values[4], values[4], values[5], values[5],
+             notes, notes, emails, emails, phones, phones, whatsapps, whatsapps, lead_id),
         )
 
 
