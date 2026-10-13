@@ -746,7 +746,7 @@ def _background_research_loop() -> None:
                         break
         except Exception as exc:
             print(f"Mapeador automático — erro do ciclo: {type(exc).__name__}: {exc}")
-        time.sleep(600)
+        time.sleep(300)
 
 
 def _open_browser() -> None:
