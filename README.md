@@ -83,7 +83,8 @@ A interface roda no computador e separa a prospecção em duas etapas:
 
 1. **Buscar estabelecimentos:** digite a categoria/termo e a localidade (por exemplo, bares, restaurantes, açougues, padarias ou peixarias em uma cidade). A busca não chama a IA. Ela consulta resultados além dos que já estão no histórico e mostra apenas novos estabelecimentos.
 2. **Gerar proposta por estabelecimento:** no cartão do negócio, escolha 4K Food Service, Presença digital ou ambas, personalize a oferta se quiser e clique em “Gerar proposta”. A consulta complementar ao site e a chamada ao Gemini acontecem só nesse momento.
-3. **Estabelecimentos encontrados:** a aba guarda todos os negócios já descobertos e permite organizar a etapa comercial: para visitar, visitado ou cliente.
+3. **Encontrar responsável e contatos públicos:** em cada estabelecimento, clique em “Encontrar responsável e contatos públicos”. O Mapeador examina até seis páginas públicas do site da própria empresa à procura de nomes/cargos explicitamente publicados, telefone comercial e link de WhatsApp. O resultado é salvo no histórico com fonte e indicação de confiança. Não adivinha números nem atribui um telefone comercial ao dono sem evidência.
+4. **Estabelecimentos encontrados:** a aba guarda todos os negócios já descobertos e permite organizar a etapa comercial: para visitar, visitado ou cliente.
 
 Para iniciar no Windows, atualize com GitHub Desktop (Fetch origin e Pull origin), instale as dependências com `py -m pip install -r requirements.txt` e execute `py web_app.py`. Abra `http://127.0.0.1:5000`. O banco SQLite fica em `data/`; não o apague ao atualizar o código.
 
