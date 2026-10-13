@@ -51,6 +51,14 @@ def init_db(path: str | None = None) -> None:
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        # Novos campos opcionais: a migração preserva os bancos locais existentes.
+        existing_columns = {row["name"] for row in conn.execute("PRAGMA table_info(leads)").fetchall()}
+        for column in (
+            "contact_name", "contact_role", "contact_phone", "contact_whatsapp",
+            "contact_source", "contact_confidence", "contact_notes"
+        ):
+            if column not in existing_columns:
+                conn.execute(f"ALTER TABLE leads ADD COLUMN {column} TEXT NOT NULL DEFAULT ''")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_leads_name ON leads(name)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status)")
         # Compatibilidade com registros criados pelas versões anteriores.
