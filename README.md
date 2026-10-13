@@ -79,20 +79,12 @@ Nunca publique o arquivo `.env` nem compartilhe a chave. O projeto usa o SDK atu
 
 ## Interface web local
 
-O projeto também inclui uma interface visual para pesquisar pelo navegador, sem precisar preencher comandos a cada consulta.
+A interface roda no computador e separa a prospecção em duas etapas:
 
-1. Atualize o repositório no GitHub Desktop (Fetch origin e depois Pull origin, se aparecer).
-2. Na pasta do projeto, instale a dependência nova:
-   ```bat
-   py -m pip install -r requirements.txt
-   ```
-3. Confira se o arquivo local `.env` contém sua chave válida e um modelo Gemini disponível. Nunca publique esse arquivo.
-4. Inicie a interface:
-   ```bat
-   py web_app.py
-   ```
-5. O navegador abrirá em `http://127.0.0.1:5000`. Se não abrir automaticamente, cole esse endereço no navegador.
-6. Preencha termo/localidade, quantidade e oferta. Os resultados aparecerão na página com canais públicos, cardápio, prioridade preliminar e rascunho de mensagem.
+1. **Buscar estabelecimentos:** digite a categoria/termo e a localidade (por exemplo, bares, restaurantes, açougues, padarias ou peixarias em uma cidade). A busca não chama a IA. Ela consulta resultados além dos que já estão no histórico e mostra apenas novos estabelecimentos.
+2. **Gerar proposta por estabelecimento:** no cartão do negócio, escolha 4K Food Service, Presença digital ou ambas, personalize a oferta se quiser e clique em “Gerar proposta”. A consulta complementar ao site e a chamada ao Gemini acontecem só nesse momento.
+3. **Estabelecimentos encontrados:** a aba guarda todos os negócios já descobertos e permite organizar a etapa comercial: para visitar, visitado ou cliente.
 
-A interface roda no próprio computador; não fica publicada na internet. Feche o terminal para encerrar. A pesquisa pode levar alguns minutos. A aplicação não envia mensagens automaticamente. A coleta via navegador e as chamadas de IA dependem de internet e podem sofrer limitações temporárias.
+Para iniciar no Windows, atualize com GitHub Desktop (Fetch origin e Pull origin), instale as dependências com `py -m pip install -r requirements.txt` e execute `py web_app.py`. Abra `http://127.0.0.1:5000`. O banco SQLite fica em `data/`; não o apague ao atualizar o código.
 
+A busca depende do carregamento de resultados do Google Maps e pode encontrar menos negócios que o solicitado se o Maps não apresentar mais resultados. A aplicação não contorna bloqueios e não envia mensagens automaticamente.
