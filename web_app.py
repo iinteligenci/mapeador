@@ -624,9 +624,20 @@ def _background_research_loop() -> None:
                 for saved in records:
                     if saved.get("status") in {"removed", "in_person"}:
                         continue
-                    contacts_due = not saved.get("contact_checked_at")
-                    website_due = bool(saved.get("website")) and contacts_due
-                    if not contacts_due and not website_due:
+                    checked_text = saved.get("contact_checked_at") or ""
+                    try:
+                        checked_at = datetime.fromisoformat(checked_text) if checked_text else None
+                    except (ValueError, TypeError):
+                        checked_at = None
+                    has_public_contact = bool(
+                        saved.get("contact_whatsapp") or saved.get("contact_phone") or saved.get("phone")
+                        or saved.get("contact_emails") or saved.get("contact_phones") or saved.get("contact_whatsapps")
+                    )
+                    # Retry incomplete records weekly; never let one failed site monopolize every cycle.
+                    contacts_due = checked_at is None or (
+                        not has_public_contact and checked_at < datetime.now() - timedelta(days=7)
+                    )
+                    if not contacts_due:
                         continue
                     try:
                         contacts = find_public_business_contacts(saved)
