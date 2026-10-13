@@ -50,7 +50,7 @@ button{border:0;border-radius:10px;padding:12px 18px;background:var(--blue);colo
 <header>
  <div class="brand"><div class="mark">M</div><div><h1>Mapeador</h1><div class="category">Inteligência comercial para negócios alimentícios</div></div></div>
  <p class="sub">Encontre estabelecimentos, investigue sua presença digital e organize oportunidades para revisão humana.</p>
- <nav class="nav"><a href="/">＋ Nova prospecção</a><a href="/history">▤ Restaurantes já pesquisados</a></nav>
+ <nav class="nav"><a href="/">＋ Nova prospecção</a><a href="/history">▤ Estabelecimentos encontrados</a></nav>
 </header>
 <section class="panel">
  <h2>Nova prospecção</h2>
@@ -67,14 +67,14 @@ button{border:0;border-radius:10px;padding:12px 18px;background:var(--blue);colo
 {% if error %}<div class="alert">{{ error }}</div>{% endif %}
 {% if results is not none %}
 <section class="panel">
- <h2>Resultado desta pesquisa</h2>
+ <h2>Estabelecimentos encontrados</h2>
  <div class="stats">
   <div class="stat"><strong>{{ results|length }}</strong><span>Estabelecimentos encontrados</span></div>
   <div class="stat"><strong>{{ analyzed }}</strong><span>Análises de IA concluídas</span></div>
   <div class="stat"><strong>{{ failed }}</strong><span>Análises pendentes ou com erro</span></div>
   <div class="stat"><strong>{{ skipped }}</strong><span>Já pesquisados — ignorados</span></div>
  </div>
- {% if results|length == 0 %}<p class="empty">{% if skipped %}Todos os estabelecimentos encontrados já estavam cadastrados. Não repetimos a análise. Confira a aba “Restaurantes já pesquisados”.{% else %}Nenhum estabelecimento novo retornado. Tente outro termo ou localidade.{% endif %}</p>{% else %}
+ {% if results|length == 0 %}<p class="empty">Não encontrei novos estabelecimentos nessa consulta. Os resultados anteriores são ignorados automaticamente; tente ampliar a região ou mudar o termo para encontrar outros negócios alimentícios.</p>{% else %}
  <div class="results" style="margin-top:16px">
  {% for item in results %}
   {% set lead = item.lead %}{% set research = item.research %}{% set analyses = item.analyses %}
@@ -323,14 +323,14 @@ def set_status():
 
 HISTORY_PAGE = r"""
 <!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mapeador | Restaurantes já pesquisados</title>
+<title>Mapeador | Estabelecimentos encontrados</title>
 <style>
 :root{color-scheme:dark;--line:#26354d;--muted:#a6b4ca;--text:#edf4ff;--blue:#4da3ff}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top left,#162b49 0,#0b1220 48%);font:15px/1.5 Inter,Segoe UI,Arial,sans-serif;color:var(--text)}
 main{max-width:1180px;margin:auto;padding:34px 22px 64px}.brand{display:flex;gap:12px;align-items:center}.mark{width:46px;height:46px;border-radius:14px;background:linear-gradient(135deg,#58b7ff,#5b6cff);display:grid;place-items:center;font-size:24px;font-weight:800}h1{font-size:27px;margin:0}.sub,.muted{color:var(--muted)}.panel{background:#121d30;border:1px solid var(--line);border-radius:16px;padding:20px;margin:18px 0}.nav{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0}.nav a{color:#b9dcff;text-decoration:none;border:1px solid #354761;background:#122039;padding:9px 13px;border-radius:10px}.filters{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 20px}.filters a{padding:8px 12px;border:1px solid var(--line);border-radius:9px;text-decoration:none;color:var(--text)}.filters a.active{background:#1c4772;border-color:#4da3ff}.entry{background:#0d1829;border:1px solid var(--line);border-radius:13px;padding:16px;margin:12px 0}.top{display:flex;justify-content:space-between;gap:12px;align-items:start}.entry h3{margin:0}.pill{border-radius:99px;padding:4px 10px;background:#18344f;color:#b9dcff;font-size:12px}.meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0}.meta div{overflow-wrap:anywhere}.meta b{display:block;font-size:12px;color:var(--muted);font-weight:500}a{color:#83c5ff}select,button{border:1px solid #354761;background:#0c1627;color:var(--text);padding:10px;border-radius:9px;font:inherit}.statusform{display:flex;gap:8px;flex-wrap:wrap;align-items:center;border-top:1px solid var(--line);padding-top:12px}.statusform button{background:var(--blue);color:#071321;font-weight:700;cursor:pointer}.empty{color:var(--muted);padding:22px 0}.hint{font-size:12px;color:var(--muted)}@media(max-width:650px){main{padding:20px 13px}.meta{grid-template-columns:1fr}.top{flex-direction:column}}
 </style></head><body><main>
-<header><div class="brand"><div class="mark">M</div><div><h1>Restaurantes já pesquisados</h1><div class="muted">Seu histórico comercial fica salvo no banco local.</div></div></div>
-<nav class="nav"><a href="/">＋ Nova prospecção</a><a href="/history">▤ Restaurantes já pesquisados</a></nav></header>
+<header><div class="brand"><div class="mark">M</div><div><h1>Estabelecimentos encontrados</h1><div class="muted">Seu histórico comercial fica salvo no banco local.</div></div></div>
+<nav class="nav"><a href="/">＋ Nova prospecção</a><a href="/history">▤ Estabelecimentos encontrados</a></nav></header>
 <section class="panel"><h2>{{ leads|length }} estabelecimento(s) nesta lista</h2>
 <div class="filters">
 <a href="/history" class="{{ 'active' if selected == 'all' else '' }}">Todos</a>
