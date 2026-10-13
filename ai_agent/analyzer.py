@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 from typing import Any
 
 from google import genai
@@ -58,7 +59,32 @@ Responda SOMENTE com JSON válido neste formato:
 O score de 0 a 100 é apenas uma prioridade preliminar para revisão humana, não uma
 avaliação comprovada da qualidade ou da gestão do estabelecimento.
 """
-    response = client.models.generate_content(model=model_name, contents=prompt)
+    # Erros transitórios do serviço Gemini (ex.: 429/503) podem se resolver
+    # após uma pausa curta. Limita as tentativas para não travar a prospecção.
+    response = None
+    for attempt in range(3):
+        try:
+            response = client.models.generate_content(model=model_name, contents=prompt)
+            break
+        except Exception as exc:
+            code = getattr(exc, "code", None) or getattr(exc, "status_code", None)
+            error_text = str(exc).upper()
+            transient = (
+                code in (429, 500, 502, 503, 504)
+                or any(token in error_text for token in (
+                    "429", "500", "502", "503", "504",
+                    "UNAVAILABLE", "RESOURCE_EXHAUSTED", "INTERNAL"
+                ))
+            )
+            if not transient or attempt == 2:
+                raise
+            wait_seconds = 2 ** (attempt + 1)  # 2s e depois 4s
+            print(
+                f"Gemini temporariamente indisponível; nova tentativa "
+                f"{attempt + 2}/3 em {wait_seconds}s..."
+            )
+            time.sleep(wait_seconds)
+
     raw = (getattr(response, "text", "") or "").strip()
     raw = re.sub(r"^\s*```(?:json)?\s*|\s*```\s*$", "", raw, flags=re.I)
     try:
