@@ -201,8 +201,11 @@ def queue_campaign(campaign_id: int, lead_ids: list[int], path: str | None = Non
     with _connect(path) as conn:
         for lead_id in lead_ids:
             conn.execute(
-                "INSERT OR IGNORE INTO campaign_events(campaign_id, lead_id) VALUES (?, ?)",
-                (campaign_id, lead_id),
+                """INSERT OR IGNORE INTO campaign_events(campaign_id, lead_id)
+                   SELECT ?, ? WHERE NOT EXISTS (
+                     SELECT 1 FROM campaign_events WHERE lead_id=? AND status='opted_out'
+                   )""",
+                (campaign_id, lead_id, lead_id),
             )
 
 
