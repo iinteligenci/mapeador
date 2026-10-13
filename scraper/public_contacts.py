@@ -10,6 +10,7 @@ from bs4 import BeautifulSoup
 
 HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; MapeadorResearch/1.0)"}
 MAX_PAGES = 6
+CNPJ_RE = re.compile(r"(?<!\\d)(\\d{2}\\.?\\d{3}\\.?\\d{3}/?\\d{4}-?\\d{2})(?!\\d)")
 PHONE_RE = re.compile(r"(?:\+?55\s*)?(?:\(?\d{2}\)?\s*)?(?:9\s*)?\d{4}[-.\s]?\d{4}")
 ROLE_RE = re.compile(
     r"(?i)\b(propriet[aá]ri[oa]|fundador[a]?|s[oó]ci[oa](?:-fundador[a]?)?|"
@@ -34,6 +35,8 @@ def find_public_business_contacts(lead: dict[str, Any], max_pages: int = MAX_PAG
         "contact_confidence": "Não identificado",
         "contact_notes": [],
         "contact_sources": [],
+        "cnpj": "",
+        "cnpj_source": "",
     }
     base = str(lead.get("website") or "").strip()
     if not base.startswith(("https://", "http://")):
@@ -82,6 +85,13 @@ def find_public_business_contacts(lead: dict[str, Any], max_pages: int = MAX_PAG
 
         result["contact_sources"].append(response.url)
         text = _clean(soup.get_text(" ", strip=True))
+        if not result["cnpj"]:
+            cnpj_match = CNPJ_RE.search(text)
+            if cnpj_match:
+                digits = re.sub(r"\\D", "", cnpj_match.group(1))
+                if len(digits) == 14:
+                    result["cnpj"] = digits
+                    result["cnpj_source"] = response.url
         for match in NAME_RE.finditer(text):
             name = _clean(match.group(1))
             start = max(0, match.start() - 100)
