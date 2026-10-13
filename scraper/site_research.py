@@ -33,7 +33,7 @@ def _is_html(response: requests.Response) -> bool:
     return "text/html" in response.headers.get("content-type", "").lower()
 
 
-def research_public_site(lead: dict[str, Any], max_pages: int = 5) -> dict[str, Any]:
+def research_public_site(lead: dict[str, Any], max_pages: int = 3) -> dict[str, Any]:
     """Lê páginas públicas do site, sem login, sem contornar bloqueios e sem inventar dados."""
     result: dict[str, Any] = {
         "address": str(lead.get("address") or ""),
@@ -54,7 +54,7 @@ def research_public_site(lead: dict[str, Any], max_pages: int = 5) -> dict[str, 
         return result
 
     try:
-        first = requests.get(base, timeout=12, headers=HEADERS)
+        first = requests.get(base, timeout=7, headers=HEADERS)
         first.raise_for_status()
         if not _is_html(first):
             result["research_notes"].append("O site não disponibilizou uma página HTML pública para leitura.")
@@ -80,7 +80,7 @@ def research_public_site(lead: dict[str, Any], max_pages: int = 5) -> dict[str, 
             continue
         visited.add(url)
         try:
-            response = requests.get(url, timeout=10, headers=HEADERS)
+            response = requests.get(url, timeout=6, headers=HEADERS)
             response.raise_for_status()
             if not _is_html(response):
                 continue
