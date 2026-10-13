@@ -46,13 +46,15 @@ def init_db(path: str | None = None) -> None:
                 score INTEGER,
                 justification TEXT NOT NULL DEFAULT '',
                 message TEXT NOT NULL DEFAULT '',
-                status TEXT NOT NULL DEFAULT 'new',
+                status TEXT NOT NULL DEFAULT 'to_visit',
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
         """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_leads_name ON leads(name)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status)")
+        # Compatibilidade com registros criados pelas versões anteriores.
+        conn.execute("UPDATE leads SET status = 'to_visit' WHERE status IN ('new', 'draft_ready') OR status IS NULL OR status = ''")
 
 
 def save_lead(lead: dict[str, Any], path: str | None = None) -> tuple[int, bool]:
@@ -115,3 +117,19 @@ def get_leads(status: str | None = None, path: str | None = None) -> list[dict[s
         else:
             rows = conn.execute("SELECT * FROM leads ORDER BY updated_at DESC")
         return [dict(row) for row in rows]
+
+
+
+def update_lead_status(lead_id: int, status: str, path: str | None = None) -> None:
+    """Atualiza o estágio comercial de um estabelecimento."""
+    allowed = {"to_visit", "visited", "client"}
+    if status not in allowed:
+        raise ValueError("Status inválido.")
+    init_db(path)
+    with _connect(path) as conn:
+        cursor = conn.execute(
+            "UPDATE leads SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (status, lead_id),
+        )
+        if cursor.rowcount == 0:
+            raise ValueError("Estabelecimento não encontrado.")
