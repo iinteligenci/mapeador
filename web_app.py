@@ -179,14 +179,15 @@ def search():
 
     results: list[dict[str, Any]] = []
     skipped = 0
-    saved_by_link = {item.get("link"): item for item in get_leads(path=db_path)}
     for lead in leads:
         try:
             lead_id, inserted = save_lead(lead, db_path)
         except Exception:
             lead_id, inserted = None, True
         if not inserted:
+            # Fallback: never show an already-saved business in fresh results.
             skipped += 1
+            continue
         # Search results are quick: no website crawl and no Gemini call here.
         research = {
             "address": lead.get("address", ""),
