@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 from flask import Flask, redirect, render_template_string, request, url_for
 
 from ai_agent.analyzer import analyze_lead_profiles
-from database.db import (get_leads, init_db, save_lead, update_analysis, update_lead_status, update_public_contacts, update_business_identity, save_campaign, get_campaigns, queue_campaign, get_campaign_leads, update_campaign_event)
+from database.db import (get_leads, init_db, save_lead, update_analysis, update_lead_status, update_public_contacts, update_business_identity, save_campaign, get_campaigns, queue_campaign, get_campaign_leads, update_campaign_event, get_automation_settings, set_automation_settings, save_proposal, get_proposals)
 from scraper.maps_scraper import search_google_maps
 from scraper.public_contacts import find_public_business_contacts
 from scraper.site_research import research_public_site
@@ -53,7 +53,7 @@ button{border:0;border-radius:10px;padding:12px 18px;background:var(--blue);colo
 <header>
  <div class="brand"><div class="mark">M</div><div><h1>Mapeador</h1><div class="category">Inteligência comercial para negócios alimentícios</div></div></div>
  <p class="sub">Encontre estabelecimentos, investigue sua presença digital e organize oportunidades para revisão humana.</p>
- <nav class="nav"><a href="/">＋ Nova prospecção</a><a href="/history">▤ Estabelecimentos encontrados</a><a href="/visits">📍 Visitas presenciais</a><a href="/removed">🚫 Removidos</a><a href="/campaigns">✉ Campanhas</a></nav>
+ <nav class="nav"><a href="/">＋ Nova prospecção</a><a href="/history">▤ Estabelecimentos encontrados</a><a href="/visits">📍 Visitas presenciais</a><a href="/removed">🚫 Removidos</a><a href="/campaigns">✉ Campanhas</a><a href="/automatic">⚙ Modo automático</a><a href="/proposals/4k">Propostas 4K</a><a href="/proposals/digital">Propostas presença digital</a></nav>
 </header>
 <section class="panel">
  <h2>Nova prospecção</h2>
@@ -541,48 +541,143 @@ body{margin:0;background:#0b1220;color:#edf4ff;font:15px/1.5 Segoe UI,Arial}main
 """
 
 
+
+AUTO_PAGE = r"""
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Mapeador | Modo automático</title>
+<style>body{margin:0;background:#0b1220;color:#edf4ff;font:15px/1.5 Segoe UI,Arial}main{max-width:900px;margin:auto;padding:28px 16px}.panel{background:#121d30;border:1px solid #26354d;border-radius:14px;padding:20px;margin:16px 0}input,select{box-sizing:border-box;width:100%;background:#0c1627;color:#edf4ff;border:1px solid #354761;border-radius:9px;padding:12px;font:inherit;margin:6px 0 14px}button,.btn{display:inline-block;background:#4da3ff;color:#071321;border:0;border-radius:9px;padding:11px 15px;font-weight:700;text-decoration:none;cursor:pointer}a{color:#83c5ff}.muted{color:#a6b4ca}.nav{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}.nav a{border:1px solid #354761;padding:8px 11px;border-radius:8px;text-decoration:none}</style></head><body><main>
+<h1>Modo automático</h1><p class="muted">O Mapeador pode pesquisar negócios, complementar dados públicos e criar rascunhos separados para cada canal de contato e para cada empresa. O computador e o Mapeador precisam permanecer ligados.</p>
+<nav class="nav"><a href="/">Nova prospecção</a><a href="/history">Encontrados</a><a href="/proposals/4k">Propostas 4K</a><a href="/proposals/digital">Propostas presença digital</a><a href="/campaigns">Campanhas</a></nav>
+<section class="panel"><h2>Configuração</h2><p><strong>Status:</strong> {{ 'ATIVO' if settings.enabled else 'PAUSADO' }}</p>
+<form method="post" action="/automatic/save">
+<label>O que pesquisar (tipo de negócio + localidade)</label><input name="search_term" required value="{{settings.search_term}}" placeholder="Ex.: restaurantes e bares em Vila Velha ES">
+<label>Novos negócios por ciclo</label><select name="batch_size">{% for n in [1,2,3,5,10] %}<option value="{{n}}" {% if settings.batch_size == n %}selected{% endif %}>{{n}}</option>{% endfor %}</select>
+<label><input type="checkbox" name="enabled" value="yes" {% if settings.enabled %}checked{% endif %} style="width:auto"> Ativar pesquisa e enriquecimento automáticos</label>
+<button type="submit">Salvar configuração</button></form>
+<p class="muted">A cada ciclo (aproximadamente 10 minutos), o sistema tenta encontrar novos estabelecimentos e complementar os dados dos registros pendentes. Limites de acesso, falhas de sites e limites da API podem atrasar a pesquisa. O sistema não contorna bloqueios.</p>
+<p class="muted"><strong>Importante:</strong> propostas são apenas rascunhos para revisão humana. O Mapeador não envia mensagens automaticamente. Contatos só são usados quando encontrados em páginas públicas; dados não confirmados não são inventados.</p></section></main></body></html>
+"""
+
+PROPOSALS_PAGE = r"""
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Propostas automáticas</title>
+<style>body{margin:0;background:#0b1220;color:#edf4ff;font:15px/1.5 Segoe UI,Arial}main{max-width:1050px;margin:auto;padding:28px 16px}.panel,.entry{background:#121d30;border:1px solid #26354d;border-radius:14px;padding:18px;margin:14px 0}a{color:#83c5ff}.nav{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}.nav a{border:1px solid #354761;padding:8px 11px;border-radius:8px;text-decoration:none}.muted{color:#a6b4ca;font-size:13px}.draft{white-space:pre-wrap;background:#0c1627;padding:14px;border-radius:9px}.tabs{display:flex;gap:10px;flex-wrap:wrap}.tabs a{padding:10px 14px;border:1px solid #354761;border-radius:9px;text-decoration:none}.active{background:#1c4772}</style></head><body><main>
+<h1>Propostas geradas automaticamente</h1><nav class="nav"><a href="/automatic">Modo automático</a><a href="/history">Estabelecimentos encontrados</a><a href="/campaigns">Campanhas</a></nav>
+<div class="tabs"><a class="{{'active' if profile == '4k' else ''}}" href="/proposals/4k">4K Food Service ({{count4k}})</a><a class="{{'active' if profile == 'digital' else ''}}" href="/proposals/digital">Presença digital ({{countdigital}})</a></div>
+<p class="muted">Cada cartão é um rascunho separado por empresa e canal público encontrado. Nenhuma mensagem foi enviada.</p>
+{% for p in proposals %}<article class="entry"><h2>{{p.lead_name}}</h2><p class="muted">{{p.category}} · {{'4K Food Service' if p.profile == '4k' else 'Presença digital'}} · Prioridade preliminar {{p.score}}/100</p>
+<p><strong>Canal:</strong> {{p.contact_type}} · {{p.contact_value or 'Contato comercial público'}}</p><p>{{p.justification}}</p><div class="draft">{{p.message}}</div>
+{% if p.source_url %}<p><a href="{{p.source_url}}" target="_blank" rel="noopener">Ver fonte pública do contato</a></p>{% endif %}
+<p class="muted">Rascunho salvo em {{p.created_at}}. Revise os dados, a adequação da oferta e a base legal antes de qualquer abordagem.</p></article>{% else %}<p class="muted">Ainda não há propostas para esta empresa. Ative o modo automático e aguarde a pesquisa e a coleta de contatos públicos.</p>{% endfor %}
+</main></body></html>
+"""
+
+
+@app.get("/automatic")
+def automatic_mode():
+    settings = get_automation_settings(os.getenv("DATABASE_PATH", "data/mapeador.sqlite3"))
+    return render_template_string(AUTO_PAGE, settings=settings)
+
+
+@app.post("/automatic/save")
+def automatic_save():
+    term = (request.form.get("search_term") or "").strip()
+    try:
+        size = int(request.form.get("batch_size", "3"))
+        set_automation_settings(request.form.get("enabled") == "yes", term, size, os.getenv("DATABASE_PATH", "data/mapeador.sqlite3"))
+    except (ValueError, TypeError) as exc:
+        return f"Configuração inválida: {exc}", 400
+    return redirect(url_for("automatic_mode"))
+
+
+@app.get("/proposals/<profile>")
+def proposals_page(profile: str):
+    if profile not in {"4k", "digital"}:
+        return "Empresa inválida.", 404
+    db_path = os.getenv("DATABASE_PATH", "data/mapeador.sqlite3")
+    all_proposals = get_proposals(path=db_path)
+    proposals = [p for p in all_proposals if p.get("profile") == profile]
+    return render_template_string(PROPOSALS_PAGE, profile=profile, proposals=proposals,
+        count4k=sum(1 for p in all_proposals if p.get("profile") == "4k"),
+        countdigital=sum(1 for p in all_proposals if p.get("profile") == "digital"))
+
+
 def _background_research_loop() -> None:
-    """Enriquece poucos registros por ciclo enquanto a aplicação local estiver rodando."""
+    """Pesquisa continuamente quando ativada, enriquece dados públicos e gera rascunhos por perfil/contato."""
     while True:
         try:
             db_path = os.getenv("DATABASE_PATH", "data/mapeador.sqlite3")
-            records = get_leads(path=db_path)
-            # If the latest campaign has a prospecting term, add newly discovered businesses to its review queue.
-            active_campaigns = get_campaigns(db_path)
-            active_campaign = next((item for item in active_campaigns if item.get("search_term")), None)
-            if active_campaign:
+            settings = get_automation_settings(db_path)
+            if settings.get("enabled"):
+                records = get_leads(path=db_path)
                 known_links = {str(item.get("link") or "").split("?")[0].rstrip("/") for item in records}
-                new_leads = asyncio.run(search_google_maps(active_campaign["search_term"], 3, exclude_links=known_links))
-                new_ids = []
-                for new_lead in new_leads:
-                    new_id, inserted = save_lead(new_lead, db_path)
-                    if inserted:
-                        new_ids.append(new_id)
-                if new_ids:
-                    queue_campaign(int(active_campaign["id"]), new_ids, db_path)
-            cutoff = datetime.now() - timedelta(days=7)
-            processed = 0
-            for lead in records:
-                checked = lead.get("contact_checked_at") or ""
                 try:
-                    checked_at = datetime.fromisoformat(checked)
-                except (ValueError, TypeError):
-                    checked_at = None
-                if checked_at and checked_at > cutoff and lead.get("cnpj"):
-                    continue
-                if not lead.get("website"):
-                    continue
-                contacts = find_public_business_contacts(lead)
-                update_public_contacts(int(lead["id"]), contacts, db_path)
-                update_business_identity(
-                    int(lead["id"]), contacts.get("cnpj", ""), contacts.get("cnpj_source", ""), db_path
-                )
-                processed += 1
-                if processed >= 2:
-                    break
-        except Exception:
-            pass
-        time.sleep(1800)
+                    found = asyncio.run(search_google_maps(
+                        settings.get("search_term") or "restaurantes em Vila Velha ES",
+                        int(settings.get("batch_size") or 3), exclude_links=known_links))
+                    for new_lead in found:
+                        save_lead(new_lead, db_path)
+                except Exception as exc:
+                    print(f"Mapeador automático — pesquisa: {type(exc).__name__}: {exc}")
+
+                # Refresh records after discovery; process a small batch each cycle to limit load.
+                records = get_leads(path=db_path)
+                processed = 0
+                for saved in records:
+                    if saved.get("status") in {"removed", "in_person"}:
+                        continue
+                    contacts_due = not saved.get("contact_checked_at")
+                    website_due = bool(saved.get("website")) and contacts_due
+                    if not contacts_due and not website_due:
+                        continue
+                    try:
+                        contacts = find_public_business_contacts(saved)
+                        update_public_contacts(int(saved["id"]), contacts, db_path)
+                        update_business_identity(int(saved["id"]), contacts.get("cnpj", ""),
+                                                 contacts.get("cnpj_source", ""), db_path)
+                        research = research_public_site(saved)
+                        endpoints = []
+                        for value in contacts.get("contact_whatsapps", []):
+                            endpoints.append(("WhatsApp", value, next(iter(contacts.get("contact_sources", [])), contacts.get("contact_source", ""))))
+                        for value in contacts.get("contact_phones", []):
+                            endpoints.append(("Telefone", value, contacts.get("contact_source", "")))
+                        for value in contacts.get("contact_emails", []):
+                            endpoints.append(("E-mail", value, contacts.get("contact_source", "")))
+                        # Fallback to the public business number from Maps if the site has no channels.
+                        if not endpoints:
+                            raw = contacts.get("contact_whatsapp") or contacts.get("contact_phone") or saved.get("phone") or ""
+                            if raw:
+                                endpoints.append(("Telefone comercial", raw, contacts.get("contact_source") or saved.get("link", "")))
+                        if endpoints:
+                            lead_for_ai = {
+                                **saved,
+                                "address": saved.get("address", ""),
+                                "instagram": research.get("instagram", ""),
+                                "channels": research.get("channels", []),
+                                "menu_url": research.get("menu_url", ""),
+                                "menu_items": research.get("menu_items", []),
+                                "public_platforms": research.get("public_platforms", []),
+                                "research_notes": research.get("research_notes", []),
+                            }
+                            analyses = analyze_lead_profiles(lead_for_ai, ["4k", "digital"])
+                            for profile_key, analysis in analyses.items():
+                                for contact_type, contact_value, source_url in endpoints:
+                                    save_proposal(int(saved["id"]), profile_key, contact_type,
+                                                  contact_value, source_url, analysis, db_path)
+                            combined = {
+                                "score": max(a["score"] for a in analyses.values()),
+                                "justificativa": "\n".join(a["justificativa"] for a in analyses.values()),
+                                "mensagem": "\n\n".join(
+                                    ("4K Food Service" if key == "4k" else "Presença digital") + ":\n" + value["mensagem"]
+                                    for key, value in analyses.items()),
+                            }
+                            update_analysis(int(saved["id"]), combined, db_path)
+                        processed += 1
+                    except Exception as exc:
+                        print(f"Mapeador automático — {saved.get('name','estabelecimento')}: {type(exc).__name__}: {exc}")
+                    if processed >= 2:
+                        break
+        except Exception as exc:
+            print(f"Mapeador automático — erro do ciclo: {type(exc).__name__}: {exc}")
+        time.sleep(600)
 
 
 def _open_browser() -> None:
