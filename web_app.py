@@ -694,6 +694,9 @@ def _background_research_loop() -> None:
                     )
                     if not contacts_due:
                         continue
+                    # Count attempts, not only successes, so repeated failures cannot monopolize
+                    # the worker and block later establishments.
+                    processed += 1
                     try:
                         # AI-assisted web research runs before the site scraper, helping discover
                         # official pages and public contact channels missed by Maps/site-only parsing.
@@ -776,7 +779,6 @@ def _background_research_loop() -> None:
                                     for key, value in analyses.items()),
                             }
                             update_analysis(int(saved["id"]), combined, db_path)
-                        processed += 1
                     except Exception as exc:
                         print(f"Mapeador automático — {saved.get('name','estabelecimento')}: {type(exc).__name__}: {exc}")
                     if processed >= 2:
