@@ -569,13 +569,17 @@ AUTO_PAGE = r"""
 <style>body{margin:0;background:#0b1220;color:#edf4ff;font:15px/1.5 Segoe UI,Arial}main{max-width:900px;margin:auto;padding:28px 16px}.panel{background:#121d30;border:1px solid #26354d;border-radius:14px;padding:20px;margin:16px 0}input,select{box-sizing:border-box;width:100%;background:#0c1627;color:#edf4ff;border:1px solid #354761;border-radius:9px;padding:12px;font:inherit;margin:6px 0 14px}button,.btn{display:inline-block;background:#4da3ff;color:#071321;border:0;border-radius:9px;padding:11px 15px;font-weight:700;text-decoration:none;cursor:pointer}a{color:#83c5ff}.muted{color:#a6b4ca}.nav{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}.nav a{border:1px solid #354761;padding:8px 11px;border-radius:8px;text-decoration:none}</style></head><body><main>
 <h1>Modo automático</h1><p class="muted">O Mapeador pode pesquisar negócios, complementar dados públicos e criar rascunhos separados para cada canal de contato e para cada empresa. O computador e o Mapeador precisam permanecer ligados.</p>
 <nav class="nav"><a href="/">Nova prospecção</a><a href="/history">Encontrados</a><a href="/proposals/4k">Propostas 4K</a><a href="/proposals/digital">Propostas presença digital</a><a href="/campaigns">Campanhas</a></nav>
-<section class="panel"><h2>Configuração</h2><p><strong>Status:</strong> {{ 'ATIVO' if settings.enabled else 'PAUSADO' }}</p>
+<section class="panel"><h2>Controle da automação</h2><p><strong>Status:</strong> <span style="color:{{ '#35d49a' if settings.enabled else '#ffcc80' }};font-weight:800">{{ 'LIGADO' if settings.enabled else 'DESLIGADO' }}</span></p>
+<form method="post" action="/automatic/toggle" style="display:flex;gap:10px;flex-wrap:wrap">
+<button type="submit" name="enabled" value="yes" style="background:#35d49a">▶ Ligar automação</button>
+<button type="submit" name="enabled" value="no" style="background:#ffcc80">Ⅱ Desligar automação</button>
+</form>
+<h2 style="margin-top:24px">Configuração da pesquisa</h2>
 <form method="post" action="/automatic/save">
 <label>O que pesquisar (tipo de negócio + localidade)</label><input name="search_term" required value="{{settings.search_term}}" placeholder="Ex.: restaurantes e bares em Vila Velha ES">
 <label>Novos negócios por ciclo</label><select name="batch_size">{% for n in [1,2,3,5,10] %}<option value="{{n}}" {% if settings.batch_size == n %}selected{% endif %}>{{n}}</option>{% endfor %}</select>
-<label><input type="checkbox" name="enabled" value="yes" {% if settings.enabled %}checked{% endif %} style="width:auto"> Ativar pesquisa e enriquecimento automáticos</label>
 <button type="submit">Salvar configuração</button></form>
-<p class="muted">A cada ciclo (aproximadamente 10 minutos), o sistema tenta encontrar novos estabelecimentos e complementar os dados dos registros pendentes. Limites de acesso, falhas de sites e limites da API podem atrasar a pesquisa. O sistema não contorna bloqueios.</p>
+<p class="muted">Quando ligada, a automação roda em ciclos de aproximadamente 5 minutos. Cada ciclo também leva tempo para executar as buscas. O computador e o programa precisam permanecer ligados. Limites de acesso, falhas de sites e limites da API podem atrasar a pesquisa; o sistema não contorna bloqueios.</p>
 <p class="muted"><strong>Importante:</strong> propostas são apenas rascunhos para revisão humana. O Mapeador não envia mensagens automaticamente. Contatos só são usados quando encontrados em páginas públicas; dados não confirmados não são inventados.</p></section></main></body></html>
 """
 
@@ -597,6 +601,16 @@ PROPOSALS_PAGE = r"""
 def automatic_mode():
     settings = get_automation_settings(os.getenv("DATABASE_PATH", "data/mapeador.sqlite3"))
     return render_template_string(AUTO_PAGE, settings=settings)
+
+
+@app.post("/automatic/toggle")
+def automatic_toggle():
+    enabled = request.form.get("enabled") == "yes"
+    db_path = os.getenv("DATABASE_PATH", "data/mapeador.sqlite3")
+    settings = get_automation_settings(db_path)
+    set_automation_settings(enabled, settings.get("search_term") or "restaurantes em Vila Velha ES",
+                            int(settings.get("batch_size") or 3), db_path)
+    return redirect(url_for("automatic_mode"))
 
 
 @app.post("/automatic/save")
