@@ -640,8 +640,9 @@ def proposals_page(profile: str):
 
 
 def _background_research_loop() -> None:
-    """Pesquisa continuamente quando ativada, enriquece dados públicos e gera rascunhos por perfil/contato."""
+    """Worker contínuo: segue para o próximo trabalho sem esperar um ciclo fixo de 5 minutos."""
     while True:
+        activity = False
         try:
             db_path = os.getenv("DATABASE_PATH", "data/mapeador.sqlite3")
             settings = get_automation_settings(db_path)
@@ -651,7 +652,7 @@ def _background_research_loop() -> None:
                 try:
                     base_term = settings.get("search_term") or "restaurantes em Vila Velha ES"
                     batch_size = int(settings.get("batch_size") or 3)
-                    # Gemini plans several targeted search formulations; each result is still verified by Maps.
+                    # Gemini plans targeted search formulations; each result is verified by Maps.
                     search_queries = plan_deep_searches(base_term, limit=4)
                     found_count = 0
                     for query in search_queries:
@@ -670,10 +671,11 @@ def _background_research_loop() -> None:
                                     break
                         except Exception as query_exc:
                             print(f"Mapeador automático — consulta '{query}': {type(query_exc).__name__}: {query_exc}")
+                    activity = found_count > 0
                 except Exception as exc:
                     print(f"Mapeador automático — pesquisa aprofundada: {type(exc).__name__}: {exc}")
 
-                # Refresh records after discovery; process a small batch each cycle to limit load.
+                # Refresh records and continuously drain every due enrichment task.
                 records = get_leads(path=db_path)
                 processed = 0
                 for saved in records:
@@ -694,9 +696,9 @@ def _background_research_loop() -> None:
                     )
                     if not contacts_due:
                         continue
-                    # Count attempts, not only successes, so repeated failures cannot monopolize
-                    # the worker and block later establishments.
+                    # Count attempts, not only successes, so failures do not block later records.
                     processed += 1
+                    activity = True
                     try:
                         # AI-assisted web research runs before the site scraper, helping discover
                         # official pages and public contact channels missed by Maps/site-only parsing.
@@ -781,11 +783,11 @@ def _background_research_loop() -> None:
                             update_analysis(int(saved["id"]), combined, db_path)
                     except Exception as exc:
                         print(f"Mapeador automático — {saved.get('name','estabelecimento')}: {type(exc).__name__}: {exc}")
-                    if processed >= 2:
-                        break
+                    # No per-cycle cap: continue to the next due establishment immediately.
         except Exception as exc:
             print(f"Mapeador automático — erro do ciclo: {type(exc).__name__}: {exc}")
-        time.sleep(300)
+        # Keep working continuously when there is work; back off only while idle or after errors.
+        time.sleep(1 if activity else 30)
 
 
 def _open_browser() -> None:
