@@ -5,14 +5,16 @@ import asyncio
 import os
 import threading
 import webbrowser
-from datetime import datetime
+import time
+from datetime import datetime, timedelta
+from urllib.parse import quote
 from typing import Any
 
 from dotenv import load_dotenv
 from flask import Flask, redirect, render_template_string, request, url_for
 
 from ai_agent.analyzer import analyze_lead_profiles
-from database.db import get_leads, init_db, save_lead, update_analysis, update_lead_status, update_public_contacts
+from database.db import (get_leads, init_db, save_lead, update_analysis, update_lead_status, update_public_contacts, update_business_identity, save_campaign, get_campaigns, queue_campaign, get_campaign_leads, update_campaign_event)
 from scraper.maps_scraper import search_google_maps
 from scraper.public_contacts import find_public_business_contacts
 from scraper.site_research import research_public_site
@@ -51,7 +53,7 @@ button{border:0;border-radius:10px;padding:12px 18px;background:var(--blue);colo
 <header>
  <div class="brand"><div class="mark">M</div><div><h1>Mapeador</h1><div class="category">Inteligência comercial para negócios alimentícios</div></div></div>
  <p class="sub">Encontre estabelecimentos, investigue sua presença digital e organize oportunidades para revisão humana.</p>
- <nav class="nav"><a href="/">＋ Nova prospecção</a><a href="/history">▤ Estabelecimentos encontrados</a></nav>
+ <nav class="nav"><a href="/">＋ Nova prospecção</a><a href="/history">▤ Estabelecimentos encontrados</a><a href="/campaigns">✉ Campanhas</a></nav>
 </header>
 <section class="panel">
  <h2>Nova prospecção</h2>
@@ -271,6 +273,59 @@ def enrich_public_contacts():
     )
 
 
+@app.get("/campaigns")
+def campaigns():
+    return render_template_string(CAMPAIGNS_PAGE, campaigns=get_campaigns())
+
+
+@app.post("/campaigns/create")
+def create_campaign():
+    name = (request.form.get("name") or "").strip()
+    profile = (request.form.get("profile") or "4k").strip()
+    message = (request.form.get("message") or "").strip()
+    if profile not in {"4k", "digital"} or not message:
+        return "Escolha uma empresa e escreva a mensagem antes de salvar.", 400
+    db_path = os.getenv("DATABASE_PATH", "data/mapeador.sqlite3")
+    campaign_id = save_campaign(name, profile, message, db_path)
+    leads = get_leads(path=db_path)
+    eligible = [
+        int(lead["id"]) for lead in leads
+        if (lead.get("contact_whatsapp") or lead.get("contact_phone") or lead.get("phone"))
+    ]
+    queue_campaign(campaign_id, eligible, db_path)
+    return redirect(url_for("campaign_detail", campaign_id=campaign_id))
+
+
+@app.get("/campaigns/<int:campaign_id>")
+def campaign_detail(campaign_id: int):
+    db_path = os.getenv("DATABASE_PATH", "data/mapeador.sqlite3")
+    campaign = next((c for c in get_campaigns(db_path) if c["id"] == campaign_id), None)
+    if not campaign:
+        return "Campanha não encontrada.", 404
+    rows = get_campaign_leads(campaign_id, db_path)
+    for lead in rows:
+        raw = lead.get("contact_whatsapp") or lead.get("contact_phone") or lead.get("phone") or ""
+        digits = "".join(ch for ch in raw if ch.isdigit())
+        if len(digits) in {10, 11}:
+            digits = "55" + digits
+        lead["wa_url"] = f"https://wa.me/{digits}?text={quote(campaign['message'])}" if len(digits) >= 12 else ""
+        lead["chosen_phone"] = raw
+    return render_template_string(CAMPAIGN_DETAIL_PAGE, campaign=campaign, leads=rows)
+
+
+@app.post("/campaigns/event")
+def campaign_event():
+    db_path = os.getenv("DATABASE_PATH", "data/mapeador.sqlite3")
+    campaign_id = int(request.form.get("campaign_id", "0"))
+    lead_id = int(request.form.get("lead_id", "0"))
+    status = (request.form.get("status") or "pending").strip()
+    consent = request.form.get("consent") == "yes"
+    if status in {"opened", "sent", "replied"} and not consent:
+        return "Confirme que existe autorização para contato antes de registrar envio.", 400
+    update_campaign_event(campaign_id, lead_id, status, consent, db_path)
+    return redirect(url_for("campaign_detail", campaign_id=campaign_id))
+
+
 @app.post("/proposal")
 def generate_proposal():
     db_path = os.getenv("DATABASE_PATH", "data/mapeador.sqlite3")
@@ -388,7 +443,7 @@ HISTORY_PAGE = r"""
 main{max-width:1180px;margin:auto;padding:34px 22px 64px}.brand{display:flex;gap:12px;align-items:center}.mark{width:46px;height:46px;border-radius:14px;background:linear-gradient(135deg,#58b7ff,#5b6cff);display:grid;place-items:center;font-size:24px;font-weight:800}h1{font-size:27px;margin:0}.sub,.muted{color:var(--muted)}.panel{background:#121d30;border:1px solid var(--line);border-radius:16px;padding:20px;margin:18px 0}.nav{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0}.nav a{color:#b9dcff;text-decoration:none;border:1px solid #354761;background:#122039;padding:9px 13px;border-radius:10px}.filters{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 20px}.filters a{padding:8px 12px;border:1px solid var(--line);border-radius:9px;text-decoration:none;color:var(--text)}.filters a.active{background:#1c4772;border-color:#4da3ff}.entry{background:#0d1829;border:1px solid var(--line);border-radius:13px;padding:16px;margin:12px 0}.top{display:flex;justify-content:space-between;gap:12px;align-items:start}.entry h3{margin:0}.pill{border-radius:99px;padding:4px 10px;background:#18344f;color:#b9dcff;font-size:12px}.meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0}.meta div{overflow-wrap:anywhere}.meta b{display:block;font-size:12px;color:var(--muted);font-weight:500}a{color:#83c5ff}select,button{border:1px solid #354761;background:#0c1627;color:var(--text);padding:10px;border-radius:9px;font:inherit}.statusform{display:flex;gap:8px;flex-wrap:wrap;align-items:center;border-top:1px solid var(--line);padding-top:12px}.statusform button{background:var(--blue);color:#071321;font-weight:700;cursor:pointer}.empty{color:var(--muted);padding:22px 0}.hint{font-size:12px;color:var(--muted)}@media(max-width:650px){main{padding:20px 13px}.meta{grid-template-columns:1fr}.top{flex-direction:column}}
 </style></head><body><main>
 <header><div class="brand"><div class="mark">M</div><div><h1>Estabelecimentos encontrados</h1><div class="muted">Seu histórico comercial fica salvo no banco local.</div></div></div>
-<nav class="nav"><a href="/">＋ Nova prospecção</a><a href="/history">▤ Estabelecimentos encontrados</a></nav></header>
+<nav class="nav"><a href="/">＋ Nova prospecção</a><a href="/history">▤ Estabelecimentos encontrados</a><a href="/campaigns">✉ Campanhas</a></nav></header>
 <section class="panel"><h2>{{ leads|length }} estabelecimento(s) nesta lista</h2>
 <div class="filters">
 <a href="/history" class="{{ 'active' if selected == 'all' else '' }}">Todos</a>
@@ -432,10 +487,67 @@ main{max-width:1180px;margin:auto;padding:34px 22px 64px}.brand{display:flex;gap
 """
 
 
+CAMPAIGNS_PAGE = r"""
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mapeador | Campanhas</title><style>
+body{margin:0;background:#0b1220;color:#edf4ff;font:15px/1.5 Segoe UI,Arial}main{max-width:1000px;margin:auto;padding:28px 16px}.panel,.entry{background:#121d30;border:1px solid #26354d;border-radius:14px;padding:18px;margin:14px 0}input,textarea,select{box-sizing:border-box;width:100%;background:#0c1627;color:#edf4ff;border:1px solid #354761;border-radius:9px;padding:11px;font:inherit;margin:5px 0 12px}button,.btn{display:inline-block;background:#4da3ff;color:#071321;border:0;border-radius:9px;padding:10px 14px;font-weight:700;text-decoration:none;cursor:pointer}a{color:#83c5ff}.nav{display:flex;gap:12px;margin:16px 0}.muted{color:#a6b4ca;font-size:13px}
+</style></head><body><main><h1>Central de campanhas</h1><p class="muted">Você cria e revisa a mensagem. A abertura do WhatsApp é manual; nada é enviado automaticamente.</p><nav class="nav"><a href="/">Nova prospecção</a><a href="/history">Estabelecimentos encontrados</a></nav>
+<section class="panel"><h2>Nova campanha</h2><form method="post" action="/campaigns/create">
+<label>Nome da campanha</label><input name="name" placeholder="Ex.: Oferta de outubro">
+<label>Empresa</label><select name="profile"><option value="4k">4K Food Service</option><option value="digital">Presença Digital</option></select>
+<label>Mensagem que será usada no WhatsApp</label><textarea name="message" rows="6" required placeholder="Escreva e revise a mensagem antes de criar a campanha."></textarea>
+<button type="submit">Salvar mensagem e preparar lista</button></form><p class="muted">A lista inclui contatos públicos já cadastrados. Antes de contatar alguém, confirme que há base legal e autorização apropriada; respeite pedidos para não receber mensagens.</p></section>
+<section class="panel"><h2>Campanhas salvas</h2>{% for c in campaigns %}<div class="entry"><strong>{{c.name}}</strong> · {{'4K Food Service' if c.profile == '4k' else 'Presença Digital'}}<p class="muted">{{c.created_at}} · {{c.queued_count}} contatos na fila</p><a class="btn" href="/campaigns/{{c.id}}">Abrir campanha</a></div>{% else %}<p class="muted">Nenhuma campanha criada ainda.</p>{% endfor %}</section></main></body></html>
+"""
+
+CAMPAIGN_DETAIL_PAGE = r"""
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Campanha</title><style>
+body{margin:0;background:#0b1220;color:#edf4ff;font:15px/1.5 Segoe UI,Arial}main{max-width:1000px;margin:auto;padding:28px 16px}.panel,.entry{background:#121d30;border:1px solid #26354d;border-radius:14px;padding:18px;margin:14px 0}a{color:#83c5ff}.btn,button{display:inline-block;background:#4da3ff;color:#071321;border:0;border-radius:9px;padding:10px 14px;font-weight:700;text-decoration:none;cursor:pointer}input,select{background:#0c1627;color:#edf4ff;border:1px solid #354761;border-radius:9px;padding:9px}label,.muted{color:#a6b4ca;font-size:13px}.draft{white-space:pre-wrap;background:#0c1627;padding:12px;border-radius:9px}.entry form{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+</style></head><body><main><p><a href="/campaigns">← Campanhas</a></p><h1>{{campaign.name}}</h1><p class="muted">{{'4K Food Service' if campaign.profile == '4k' else 'Presença Digital'}} · {{leads|length}} contatos</p><section class="panel"><h2>Mensagem aprovada por você</h2><div class="draft">{{campaign.message}}</div><p class="muted">Para abrir a conversa, marque a confirmação de autorização aplicável e clique em Abrir WhatsApp. Você ainda precisa conferir e enviar dentro do WhatsApp.</p></section>
+{% for lead in leads %}<article class="entry"><h3>{{lead.name}}</h3><p>{{lead.category}} · {{lead.chosen_phone or 'Sem telefone público'}}</p><p class="muted">WhatsApp: {{lead.contact_whatsapp or 'não confirmado'}} · CNPJ: {{lead.cnpj or 'não identificado publicamente'}}</p>
+{% if lead.wa_url %}<a class="btn" href="{{lead.wa_url}}" target="_blank" rel="noopener">Abrir mensagem no WhatsApp</a>{% else %}<p class="muted">Número ausente ou inválido para link do WhatsApp.</p>{% endif %}
+<form method="post" action="/campaigns/event"><input type="hidden" name="campaign_id" value="{{campaign.id}}"><input type="hidden" name="lead_id" value="{{lead.id}}"><label><input type="checkbox" name="consent" value="yes" {% if lead.consent_confirmed %}checked{% endif %}> Confirmo que posso contatar este estabelecimento</label><select name="status"><option value="pending" {% if lead.campaign_status == 'pending' %}selected{% endif %}>Pendente</option><option value="opened" {% if lead.campaign_status == 'opened' %}selected{% endif %}>Conversa aberta</option><option value="sent" {% if lead.campaign_status == 'sent' %}selected{% endif %}>Mensagem enviada manualmente</option><option value="replied" {% if lead.campaign_status == 'replied' %}selected{% endif %}>Respondeu</option><option value="opted_out" {% if lead.campaign_status == 'opted_out' %}selected{% endif %}>Não deseja contato</option></select><button type="submit">Salvar status</button></form>
+{% if lead.campaign_status == 'opted_out' %}<p class="muted">Este contato marcou que não deseja contato nesta campanha. Não o contate novamente.</p>{% endif %}</article>{% else %}<p>Nenhum contato na fila. Pesquise e cadastre estabelecimentos primeiro.</p>{% endfor %}</main></body></html>
+"""
+
+
+def _background_research_loop() -> None:
+    """Enriquece poucos registros por ciclo enquanto a aplicação local estiver rodando."""
+    while True:
+        try:
+            db_path = os.getenv("DATABASE_PATH", "data/mapeador.sqlite3")
+            records = get_leads(path=db_path)
+            cutoff = datetime.now() - timedelta(days=7)
+            processed = 0
+            for lead in records:
+                checked = lead.get("contact_checked_at") or ""
+                try:
+                    checked_at = datetime.fromisoformat(checked)
+                except (ValueError, TypeError):
+                    checked_at = None
+                if checked_at and checked_at > cutoff and lead.get("cnpj"):
+                    continue
+                if not lead.get("website"):
+                    continue
+                contacts = find_public_business_contacts(lead)
+                update_public_contacts(int(lead["id"]), contacts, db_path)
+                update_business_identity(
+                    int(lead["id"]), contacts.get("cnpj", ""), contacts.get("cnpj_source", ""), db_path
+                )
+                processed += 1
+                if processed >= 2:
+                    break
+        except Exception:
+            pass
+        time.sleep(1800)
+
+
 def _open_browser() -> None:
     webbrowser.open("http://127.0.0.1:5000")
 
 
 if __name__ == "__main__":
+    init_db()
+    threading.Thread(target=_background_research_loop, daemon=True, name="mapeador-public-research").start()
     threading.Timer(1.0, _open_browser).start()
     app.run(host="127.0.0.1", port=int(os.getenv("PORT", "5000")), debug=False)
