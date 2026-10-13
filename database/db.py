@@ -55,10 +55,33 @@ def init_db(path: str | None = None) -> None:
         existing_columns = {row["name"] for row in conn.execute("PRAGMA table_info(leads)").fetchall()}
         for column in (
             "contact_name", "contact_role", "contact_phone", "contact_whatsapp",
-            "contact_source", "contact_confidence", "contact_notes"
+            "contact_source", "contact_confidence", "contact_notes", "cnpj", "cnpj_source",
+            "cnpj_checked_at", "contact_checked_at"
         ):
             if column not in existing_columns:
                 conn.execute(f"ALTER TABLE leads ADD COLUMN {column} TEXT NOT NULL DEFAULT ''")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS campaigns (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                profile TEXT NOT NULL,
+                message TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS campaign_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                campaign_id INTEGER NOT NULL,
+                lead_id INTEGER NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                consent_confirmed INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(campaign_id, lead_id),
+                FOREIGN KEY(campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE,
+                FOREIGN KEY(lead_id) REFERENCES leads(id) ON DELETE CASCADE
+            )
+        """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_leads_name ON leads(name)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status)")
         # Compatibilidade com registros criados pelas versões anteriores.
@@ -131,6 +154,78 @@ def update_public_contacts(lead_id: int, contacts: dict[str, Any], path: str | N
                contact_whatsapp=?, contact_source=?, contact_confidence=?,
                contact_notes=?, updated_at=CURRENT_TIMESTAMP WHERE id=?""",
             (*values, notes, lead_id),
+        )
+
+
+def update_business_identity(lead_id: int, cnpj: str = "", cnpj_source: str = "", path: str | None = None) -> None:
+    """Guarda CNPJ apenas quando encontrado explicitamente em fonte pública."""
+    init_db(path)
+    with _connect(path) as conn:
+        conn.execute(
+            """UPDATE leads SET
+               cnpj=CASE WHEN ? <> '' THEN ? ELSE cnpj END,
+               cnpj_source=CASE WHEN ? <> '' THEN ? ELSE cnpj_source END,
+               cnpj_checked_at=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP
+               WHERE id=?""",
+            (cnpj, cnpj, cnpj_source, cnpj_source, lead_id),
+        )
+
+
+def save_campaign(name: str, profile: str, message: str, path: str | None = None) -> int:
+    if profile not in {"4k", "digital"}:
+        raise ValueError("Perfil de campanha inválido.")
+    if not message.strip():
+        raise ValueError("Escreva a mensagem antes de salvar a campanha.")
+    init_db(path)
+    with _connect(path) as conn:
+        cursor = conn.execute(
+            "INSERT INTO campaigns(name, profile, message) VALUES (?, ?, ?)",
+            (name.strip() or ("Campanha 4K" if profile == "4k" else "Campanha Presença Digital"), profile, message.strip()),
+        )
+        return int(cursor.lastrowid)
+
+
+def get_campaigns(path: str | None = None) -> list[dict[str, Any]]:
+    init_db(path)
+    with _connect(path) as conn:
+        rows = conn.execute("""
+            SELECT c.*, COUNT(e.id) AS queued_count
+            FROM campaigns c LEFT JOIN campaign_events e ON e.campaign_id=c.id
+            GROUP BY c.id ORDER BY c.id DESC
+        """)
+        return [dict(row) for row in rows]
+
+
+def queue_campaign(campaign_id: int, lead_ids: list[int], path: str | None = None) -> None:
+    init_db(path)
+    with _connect(path) as conn:
+        for lead_id in lead_ids:
+            conn.execute(
+                "INSERT OR IGNORE INTO campaign_events(campaign_id, lead_id) VALUES (?, ?)",
+                (campaign_id, lead_id),
+            )
+
+
+def get_campaign_leads(campaign_id: int, path: str | None = None) -> list[dict[str, Any]]:
+    init_db(path)
+    with _connect(path) as conn:
+        rows = conn.execute("""
+            SELECT l.*, e.status AS campaign_status, e.consent_confirmed
+            FROM campaign_events e JOIN leads l ON l.id=e.lead_id
+            WHERE e.campaign_id=? ORDER BY l.name
+        """, (campaign_id,))
+        return [dict(row) for row in rows]
+
+
+def update_campaign_event(campaign_id: int, lead_id: int, status: str, consent_confirmed: bool, path: str | None = None) -> None:
+    if status not in {"pending", "opened", "sent", "replied", "opted_out"}:
+        raise ValueError("Status de campanha inválido.")
+    init_db(path)
+    with _connect(path) as conn:
+        conn.execute(
+            """UPDATE campaign_events SET status=?, consent_confirmed=?, updated_at=CURRENT_TIMESTAMP
+               WHERE campaign_id=? AND lead_id=?""",
+            (status, int(consent_confirmed), campaign_id, lead_id),
         )
 
 
