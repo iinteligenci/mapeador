@@ -116,6 +116,24 @@ def update_analysis(lead_id: int, analysis: dict[str, Any], path: str | None = N
         ))
 
 
+def update_public_contacts(lead_id: int, contacts: dict[str, Any], path: str | None = None) -> None:
+    """Persiste somente contatos observados em fontes públicas."""
+    init_db(path)
+    fields = (
+        "contact_name", "contact_role", "contact_phone", "contact_whatsapp",
+        "contact_source", "contact_confidence"
+    )
+    values = [str(contacts.get(field) or "").strip() for field in fields]
+    notes = " ".join(str(note).strip() for note in contacts.get("contact_notes", []) if str(note).strip())
+    with _connect(path) as conn:
+        conn.execute(
+            """UPDATE leads SET contact_name=?, contact_role=?, contact_phone=?,
+               contact_whatsapp=?, contact_source=?, contact_confidence=?,
+               contact_notes=?, updated_at=CURRENT_TIMESTAMP WHERE id=?""",
+            (*values, notes, lead_id),
+        )
+
+
 def get_leads(status: str | None = None, path: str | None = None) -> list[dict[str, Any]]:
     """Lista leads, opcionalmente filtrados por estado."""
     init_db(path)
