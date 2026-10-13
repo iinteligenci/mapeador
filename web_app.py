@@ -241,7 +241,7 @@ def set_status():
         update_lead_status(lead_id, status, db_path)
     except (ValueError, TypeError) as exc:
         return f"Não foi possível atualizar a etapa: {exc}", 400
-    return redirect(request.referrer or url_for("history"))
+    return redirect(url_for("history"))
 
 
 HISTORY_PAGE = r"""
