@@ -5,3 +5,6 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .playwright/
+data/
+*.sqlite3
+*.db
