@@ -128,7 +128,7 @@ document.getElementById('searchForm').addEventListener('submit', function(){
 def index():
     return render_template_string(
         PAGE, term="restaurantes em Vila Velha ES", limit=3,
-        offer="serviços de presença digital", results=None, analyzed=0, failed=0, error=None
+        offer="serviços de presença digital", results=None, analyzed=0, failed=0, skipped=0, error=None
     )
 
 
