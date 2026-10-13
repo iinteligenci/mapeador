@@ -13,11 +13,7 @@ load_dotenv()
 
 
 def analyze_lead(lead: dict[str, Any], offer: str | None = None) -> dict[str, Any]:
-    """Retorna score 0-100, justificativa e mensagem sugerida.
-
-    A avaliação é uma hipótese baseada somente nos dados fornecidos, não uma
-    verificação independente da empresa. O texto deve ser revisado por uma pessoa.
-    """
+    """Retorna score, justificativa e mensagem usando os dados públicos coletados."""
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key or api_key == "cole_sua_chave_aqui":
         raise RuntimeError("Configure GEMINI_API_KEY no arquivo .env antes de executar.")
@@ -28,24 +24,38 @@ def analyze_lead(lead: dict[str, Any], offer: str | None = None) -> dict[str, An
         "name": str(lead.get("name", ""))[:200],
         "category": str(lead.get("category", ""))[:200],
         "phone": str(lead.get("phone", ""))[:80],
+        "address": str(lead.get("address", ""))[:300],
         "website": str(lead.get("website", ""))[:300],
-        "link": str(lead.get("link", ""))[:500],
+        "instagram": str(lead.get("instagram", ""))[:300],
+        "google_maps": str(lead.get("link", ""))[:500],
+        "channels": [str(x)[:100] for x in (lead.get("channels") or [])][:20],
+        "menu_url": str(lead.get("menu_url", ""))[:500],
+        "menu_items": [str(x)[:120] for x in (lead.get("menu_items") or [])][:40],
+        "public_platforms": [str(x)[:100] for x in (lead.get("public_platforms") or [])][:20],
+        "research_notes": [str(x)[:250] for x in (lead.get("research_notes") or [])][:10],
     }
     prompt = f"""
-Você ajuda a preparar prospecção B2B ética para empresas no Brasil.
-Analise os dados fornecidos, sem pesquisar nem inventar fatos. Não deduza problemas
-de marketing como se fossem comprovados. Se houver poucos dados, diga isso.
-Crie uma mensagem inicial curta, respeitosa, com no máximo 80 palavras, sem
-pressão e terminando com uma pergunta simples. Não afirme que já analisou o site.
-Use [NOME DA SUA EMPRESA] como marcador de identidade.
+Você ajuda a preparar prospecção B2B ética para negócios alimentícios no Brasil.
+Analise somente os dados públicos fornecidos; não invente fatos nem diga que a empresa
+usa uma ferramenta se isso não estiver indicado. Diferencie:
+- fatos observados (ex.: telefone, Instagram, link de cardápio, canais encontrados);
+- indícios (ex.: itens de menu que podem não representar todo o catálogo);
+- informações não identificadas publicamente (ex.: sistema interno de gestão de vendas).
+A ausência de evidência pública NÃO significa que a empresa não use um sistema.
+Avalie se há uma oportunidade plausível para a oferta, considerando presença digital
+e meios públicos de atendimento/venda. Se houver poucos dados, diga isso. Não invente
+problemas de marketing. Crie mensagem inicial curta e respeitosa, com no máximo 80
+palavras, sem pressão e terminando com uma pergunta simples. Não afirme que já analisou
+o site em profundidade. Use [NOME DA SUA EMPRESA] como marcador de identidade.
 
 Oferta que quero apresentar: {offer or "serviços de presença digital"}
-Dados do lead: {json.dumps(safe_lead, ensure_ascii=False)}
+Dados públicos coletados: {json.dumps(safe_lead, ensure_ascii=False)}
 
 Responda SOMENTE com JSON válido neste formato:
-{{"score": 0, "justificativa": "uma frase explicando a adequação e limitações dos dados",
+{{"score": 0, "justificativa": "uma frase com a oportunidade e limitações dos dados",
 "mensagem": "mensagem comercial em português brasileiro"}}
-O score é uma estimativa de adequação da categoria à oferta, não uma avaliação da empresa.
+O score de 0 a 100 é apenas uma prioridade preliminar para revisão humana, não uma
+avaliação comprovada da qualidade ou da gestão do estabelecimento.
 """
     response = model.generate_content(prompt)
     raw = (getattr(response, "text", "") or "").strip()
