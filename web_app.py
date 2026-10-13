@@ -219,9 +219,7 @@ def search():
                         f"{'4K Food Service' if key == '4k' else 'Presença digital'}: {item['justificativa']}"
                         for key, item in analyses.items()
                     ),
-                    "mensagem": "
-
-".join(
+                    "mensagem": "\n\n".join(
                         f"{'4K Food Service' if key == '4k' else 'Presença digital'} — rascunho não enviado:
 {item['mensagem']}"
                         for key, item in analyses.items()
