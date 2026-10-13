@@ -69,6 +69,9 @@ def init_db(path: str | None = None) -> None:
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        campaign_columns = {row["name"] for row in conn.execute("PRAGMA table_info(campaigns)").fetchall()}
+        if "search_term" not in campaign_columns:
+            conn.execute("ALTER TABLE campaigns ADD COLUMN search_term TEXT NOT NULL DEFAULT ''")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS campaign_events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -171,7 +174,7 @@ def update_business_identity(lead_id: int, cnpj: str = "", cnpj_source: str = ""
         )
 
 
-def save_campaign(name: str, profile: str, message: str, path: str | None = None) -> int:
+def save_campaign(name: str, profile: str, message: str, path: str | None = None, search_term: str = "") -> int:
     if profile not in {"4k", "digital"}:
         raise ValueError("Perfil de campanha inválido.")
     if not message.strip():
@@ -179,8 +182,8 @@ def save_campaign(name: str, profile: str, message: str, path: str | None = None
     init_db(path)
     with _connect(path) as conn:
         cursor = conn.execute(
-            "INSERT INTO campaigns(name, profile, message) VALUES (?, ?, ?)",
-            (name.strip() or ("Campanha 4K" if profile == "4k" else "Campanha Presença Digital"), profile, message.strip()),
+            "INSERT INTO campaigns(name, profile, message, search_term) VALUES (?, ?, ?, ?)",
+            (name.strip() or ("Campanha 4K" if profile == "4k" else "Campanha Presença Digital"), profile, message.strip(), search_term.strip()),
         )
         return int(cursor.lastrowid)
 
