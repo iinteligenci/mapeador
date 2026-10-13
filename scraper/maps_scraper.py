@@ -105,6 +105,11 @@ async def search_google_maps(term: str, limit: int = 10) -> list[dict[str, str]]
                     website_link = page.locator('a[data-item-id="authority"]').first
                     if await website_link.count():
                         lead["website"] = _clean(await website_link.get_attribute("href"))
+                    menu_link = page.locator(
+                        'a[data-item-id*="menu"], a[aria-label*="Cardápio"], a[aria-label*="Menu"]'
+                    ).first
+                    if await menu_link.count():
+                        lead["menu_url"] = _clean(await menu_link.get_attribute("href"))
                 except Exception as exc:
                     logger.debug("Detalhes incompletos para %s: %s", lead["name"], exc)
                 results.append(lead)
