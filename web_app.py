@@ -15,6 +15,7 @@ from flask import Flask, redirect, render_template_string, request, url_for
 
 from ai_agent.analyzer import analyze_lead_profiles
 from ai_agent.research_planner import plan_deep_searches
+from ai_agent.deep_enrichment import enrich_business_with_ai
 from database.db import (get_leads, init_db, save_lead, update_analysis, update_lead_status, update_public_contacts, update_business_identity, save_campaign, get_campaigns, queue_campaign, get_campaign_leads, update_campaign_event, get_automation_settings, set_automation_settings, save_proposal, get_proposals)
 from scraper.maps_scraper import search_google_maps
 from scraper.public_contacts import find_public_business_contacts
@@ -657,11 +658,51 @@ def _background_research_loop() -> None:
                     if not contacts_due:
                         continue
                     try:
-                        contacts = find_public_business_contacts(saved)
+                        # AI-assisted web research runs before the site scraper, helping discover
+                        # official pages and public contact channels missed by Maps/site-only parsing.
+                        ai_research = enrich_business_with_ai(saved)
+                        lead_for_contacts = {
+                            **saved,
+                            "website": saved.get("website") or ai_research.get("website", ""),
+                        }
+                        contacts = find_public_business_contacts(lead_for_contacts)
+                        # Merge only sourced, publicly discovered AI results; keep prior values.
+                        contacts["contact_emails"] = list(dict.fromkeys(
+                            list(contacts.get("contact_emails") or []) + list(ai_research.get("emails") or [])
+                        ))
+                        contacts["contact_phones"] = list(dict.fromkeys(
+                            list(contacts.get("contact_phones") or []) + list(ai_research.get("phones") or [])
+                        ))
+                        contacts["contact_whatsapps"] = list(dict.fromkeys(
+                            list(contacts.get("contact_whatsapps") or []) + list(ai_research.get("whatsapps") or [])
+                        ))
+                        if not contacts.get("contact_email") and contacts["contact_emails"]:
+                            contacts["contact_email"] = contacts["contact_emails"][0]
+                        if not contacts.get("contact_whatsapp") and contacts["contact_whatsapps"]:
+                            contacts["contact_whatsapp"] = contacts["contact_whatsapps"][0]
+                        if not contacts.get("contact_phone") and contacts["contact_phones"]:
+                            contacts["contact_phone"] = contacts["contact_phones"][0]
+                        contacts["contact_sources"] = list(dict.fromkeys(
+                            list(contacts.get("contact_sources") or []) + list(ai_research.get("sources") or [])
+                        ))
+                        if ai_research.get("website") and not saved.get("website"):
+                            saved["website"] = ai_research["website"]
                         update_public_contacts(int(saved["id"]), contacts, db_path)
                         update_business_identity(int(saved["id"]), contacts.get("cnpj", ""),
                                                  contacts.get("cnpj_source", ""), db_path)
-                        research = research_public_site(saved)
+                        research = research_public_site({
+                            **saved,
+                            "website": saved.get("website") or ai_research.get("website", ""),
+                            "menu_url": ai_research.get("menu_url") or saved.get("menu_url", ""),
+                        })
+                        if ai_research.get("instagram") and not research.get("instagram"):
+                            research["instagram"] = ai_research["instagram"]
+                        if ai_research.get("menu_url") and not research.get("menu_url"):
+                            research["menu_url"] = ai_research["menu_url"]
+                        if ai_research.get("notes"):
+                            research.setdefault("research_notes", []).extend(ai_research["notes"])
+                        if ai_research.get("sources"):
+                            research.setdefault("sources", []).extend(ai_research["sources"])
                         endpoints = []
                         for value in contacts.get("contact_whatsapps", []):
                             endpoints.append(("WhatsApp", value, next(iter(contacts.get("contact_sources", [])), contacts.get("contact_source", ""))))
