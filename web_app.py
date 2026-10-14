@@ -465,19 +465,8 @@ def routes():
     db_path = os.getenv("DATABASE_PATH", "data/mapeador.sqlite3")
     init_db(db_path)
     leads = [lead for lead in get_leads(path=db_path) if lead.get("status") == "in_person"]
-    # Older records may not have saved addresses. Recover them only when Maps returns the same place URL.
-    for lead in leads:
-        if (lead.get("address") or "").strip() or not lead.get("link"):
-            continue
-        try:
-            candidates = asyncio.run(search_google_maps(str(lead.get("name") or "") + " " + str(lead.get("category") or "") + " Vila Velha ES", 5))
-            target = str(lead.get("link") or "").split("?")[0].rstrip("/")
-            match = next((item for item in candidates if str(item.get("link") or "").split("?")[0].rstrip("/") == target and str(item.get("address") or "").strip()), None)
-            if match:
-                save_lead({**lead, **match}, db_path)
-                lead["address"] = match["address"]
-        except Exception as exc:
-            print("Mapeador — falha ao recuperar endereço público:", type(exc).__name__, exc)
+    # Keep this page fast: do not run live Google Maps searches inside the page request.
+    # Missing addresses remain explicitly unidentified until enriched separately.
     groups_by_name = {}
     for lead in leads:
         address = (lead.get("address") or "").strip()
