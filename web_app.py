@@ -496,12 +496,20 @@ def removed():
 @app.post("/status")
 def set_status():
     db_path = os.getenv("DATABASE_PATH", "data/mapeador.sqlite3")
+    source = (request.form.get("return_to") or "").strip()
     try:
         lead_id = int(request.form.get("lead_id", ""))
         status = request.form.get("status", "")
         update_lead_status(lead_id, status, db_path)
     except (ValueError, TypeError) as exc:
         return f"Não foi possível atualizar a etapa: {exc}", 400
+    if source == "history":
+        selected = (request.form.get("selected") or "all").strip()
+        if selected not in {"all", "to_visit", "visited", "client"}:
+            selected = "all"
+        if selected == "all":
+            return redirect(url_for("history"))
+        return redirect(url_for("history", status=selected))
     return redirect(url_for("visits" if status == "in_person" else "removed" if status == "removed" else "history"))
 
 
@@ -548,7 +556,7 @@ main{max-width:1180px;margin:auto;padding:34px 22px 64px}.brand{display:flex;gap
 <select id="history-proposal-{{lead.id}}" name="proposal_profile"><option value="4k">4K Food Service</option><option value="digital">Presença digital</option><option value="both">Ambas as empresas</option></select>
 <input name="proposal_offer" placeholder="Oferta personalizada (opcional)" style="max-width:260px">
 <button type="submit">Gerar proposta</button></form>
-<form class="statusform" method="post" action="/status"><input type="hidden" name="lead_id" value="{{lead.id}}">
+<form class="statusform" method="post" action="/status"><input type="hidden" name="lead_id" value="{{lead.id}}"><input type="hidden" name="return_to" value="history"><input type="hidden" name="selected" value="{{selected}}">
 <label for="history-status-{{lead.id}}" class="muted">Alterar etapa:</label>
 <select id="history-status-{{lead.id}}" name="status">{% for value,label in labels.items() %}<option value="{{value}}" {% if lead.status == value %}selected{% endif %}>{{label}}</option>{% endfor %}</select>
 <button type="submit">Salvar</button></form>
