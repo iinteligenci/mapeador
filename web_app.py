@@ -17,7 +17,7 @@ from ai_agent.analyzer import analyze_lead_profiles
 from ai_agent.research_planner import plan_deep_searches
 from ai_agent.deep_enrichment import enrich_business_with_ai
 from database.db import (get_leads, init_db, save_lead, update_analysis, update_lead_status, update_public_contacts, update_business_identity, save_campaign, get_campaigns, queue_campaign, get_campaign_leads, update_campaign_event, get_automation_settings, set_automation_settings, save_proposal, get_proposals)
-from scraper.maps_scraper import search_google_maps
+from scraper.maps_scraper import search_google_maps, fetch_place_address
 from scraper.public_contacts import find_public_business_contacts
 from scraper.site_research import research_public_site
 
@@ -482,7 +482,32 @@ def routes():
         groups_by_name.setdefault(neighborhood, []).append(lead)
     groups = [{"name": name, "leads": sorted(items, key=lambda lead: (lead.get("name") or "").casefold())}
               for name, items in sorted(groups_by_name.items(), key=lambda item: item[0].casefold())]
-    return render_template_string(ROUTES_PAGE, groups=groups, total=len(leads))
+    message = request.args.get("message", "")
+    return render_template_string(ROUTES_PAGE, groups=groups, total=len(leads), message=message)
+
+
+@app.post("/routes/refresh-addresses")
+def refresh_route_addresses():
+    db_path = os.getenv("DATABASE_PATH", "data/mapeador.sqlite3")
+    leads = [lead for lead in get_leads(path=db_path) if lead.get("status") == "in_person"]
+    updated = 0
+    attempted = 0
+    for lead in leads:
+        if (lead.get("address") or "").strip() or not lead.get("link"):
+            continue
+        attempted += 1
+        try:
+            address = asyncio.run(fetch_place_address(str(lead["link"])))
+            if address:
+                save_lead({**lead, "address": address}, db_path)
+                lead["address"] = address
+                updated += 1
+        except Exception as exc:
+            print("Mapeador — falha ao buscar endereço no Google Maps:", type(exc).__name__, exc)
+    message = f"Endereços encontrados: {updated} de {attempted} estabelecimentos consultados no Google Maps."
+    if attempted and updated == 0:
+        message += " O Maps não retornou os endereços; confira o terminal para possíveis erros de acesso."
+    return redirect(url_for("routes", message=message))
 
 
 @app.get("/removed")
@@ -577,6 +602,8 @@ main{max-width:1100px;margin:auto;padding:30px 18px 60px}.panel,.neighborhood{ba
 <h1>🗺️ Rotas de visitas presenciais</h1><p class="muted">Estabelecimentos marcados como “Visita presencial”, organizados por bairro. Clique em um bairro para abrir a lista de locais.</p>
 <nav class="nav"><a href="/">Nova prospecção</a><a href="/history">Estabelecimentos encontrados</a><a href="/visits">Visitas presenciais</a><a href="/routes">Rotas</a><a href="/removed">Removidos</a><a href="/campaigns">Campanhas</a></nav>
 <section class="panel"><h2>{{ total }} estabelecimento(s) para visitar · {{ groups|length }} bairro(s)</h2>
+<form method="post" action="/routes/refresh-addresses"><button type="submit" style="background:#4da3ff;color:#071321;border:0;border-radius:9px;padding:11px 15px;font-weight:700;cursor:pointer">Buscar endereços diretamente no Google Maps</button></form>
+{% if message %}<p class="muted">{{ message }}</p>{% endif %}
 {% if not groups %}<div class="empty">Nenhum estabelecimento está marcado para visita presencial. No histórico, altere a etapa de um estabelecimento para “Visita presencial” para ele aparecer aqui.</div>{% endif %}
 {% for group in groups %}<details class="neighborhood" {% if groups|length == 1 %}open{% endif %}><summary>{{ group.name }} <span class="count">{{ group.leads|length }} local(is)</span></summary>
 {% for lead in group.leads %}<article class="entry"><h3>{{ lead.name }}</h3><div class="muted">{{ lead.category or "Categoria não identificada" }}</div>
