@@ -465,23 +465,37 @@ def routes():
     db_path = os.getenv("DATABASE_PATH", "data/mapeador.sqlite3")
     init_db(db_path)
     leads = [lead for lead in get_leads(path=db_path) if lead.get("status") == "in_person"]
-    # Keep this page fast: do not run live Google Maps searches inside the page request.
-    # Missing addresses remain explicitly unidentified until enriched separately.
+    # Google Maps often formats addresses as "... , 353 - Praia da Costa, Vila Velha - ES".
+    # Strip the street/building number prefix so all locations in the same neighborhood group together.
     groups_by_name = {}
     for lead in leads:
         address = (lead.get("address") or "").strip()
-        # Google Maps addresses commonly place the neighborhood after a comma.
         parts = [part.strip() for part in address.split(",") if part.strip()]
         neighborhood = ""
-        if len(parts) >= 3:
-            neighborhood = parts[-3]
-        elif len(parts) == 2:
-            neighborhood = parts[-2]
-        if not neighborhood or neighborhood.lower() in {"brasil", "brazil", "espírito santo", "es"}:
+        for part in parts:
+            normalized = part.strip()
+            if re.match(r"^\d+\s*[-–]\s*.+", normalized):
+                normalized = re.sub(r"^\d+\s*[-–]\s*", "", normalized).strip()
+            low = normalized.casefold()
+            if any(term in low for term in ("praia da costa", "praia de itaparica", "praia das gaivotas",
+                                             "ataíde", "ataide", "nossa sra", "nossa senhora", "coqueiral",
+                                             "itapuã", "itapua", "centro", "glória", "gloria", "soteco",
+                                             "jaburuna", "cobilândia", "cobilandia", "terra vermelha",
+                                             "barramares", "industrial", "ibituruna", "divino espírito santo")):
+                neighborhood = normalized
+                break
+        if not neighborhood and len(parts) >= 3:
+            candidate = parts[-3]
+            candidate = re.sub(r"^\d+\s*[-–]\s*", "", candidate).strip()
+            if candidate.casefold() not in {"brasil", "brazil", "espírito santo", "es", "vila velha"}:
+                neighborhood = candidate
+        if not neighborhood:
             neighborhood = "Bairro não identificado"
-        groups_by_name.setdefault(neighborhood, []).append(lead)
-    groups = [{"name": name, "leads": sorted(items, key=lambda lead: (lead.get("name") or "").casefold())}
-              for name, items in sorted(groups_by_name.items(), key=lambda item: item[0].casefold())]
+        # Merge case/punctuation variants without losing a readable label.
+        key = re.sub(r"\s+", " ", neighborhood).strip().casefold()
+        groups_by_name.setdefault(key, {"name": neighborhood, "leads": []})["leads"].append(lead)
+    groups = [{"name": group["name"], "leads": sorted(group["leads"], key=lambda lead: (lead.get("name") or "").casefold())}
+              for group in sorted(groups_by_name.values(), key=lambda item: item["name"].casefold())]
     message = request.args.get("message", "")
     return render_template_string(ROUTES_PAGE, groups=groups, total=len(leads), message=message)
 
@@ -726,6 +740,19 @@ def _background_research_loop() -> None:
         activity = False
         try:
             db_path = os.getenv("DATABASE_PATH", "data/mapeador.sqlite3")
+            # Automatically enrich one missing address from the exact Google Maps place page,
+            # even when general prospecting automation is switched off.
+            visit_without_address = next((lead for lead in get_leads(path=db_path)
+                if lead.get("status") == "in_person" and not (lead.get("address") or "").strip()
+                and lead.get("link")), None)
+            if visit_without_address:
+                try:
+                    address = asyncio.run(fetch_place_address(str(visit_without_address["link"])))
+                    if address:
+                        save_lead({**visit_without_address, "address": address}, db_path)
+                        activity = True
+                except Exception as address_exc:
+                    print("Mapeador — endereço da rota:", type(address_exc).__name__, address_exc)
             settings = get_automation_settings(db_path)
             if settings.get("enabled"):
                 records = get_leads(path=db_path)
