@@ -475,8 +475,9 @@ def routes():
         neighborhood = ""
         for part in parts:
             normalized = part.strip()
-            if re.match(r"^\d+\s*[-–]\s*.+", normalized):
-                normalized = re.sub(r"^\d+\s*[-–]\s*", "", normalized).strip()
+            # Remove address numbers and unit prefixes like "Lj 02 - Itapuã" or "Quiosque 18 - Itapuã".
+            normalized = re.sub(r"^(?:(?:loja|lj|quiosque|box|sala)\s*)?\d+\s*[-–:]\s*", "", normalized, flags=re.IGNORECASE).strip()
+            normalized = re.sub(r"^(?:loja|lj|quiosque|box|sala)\s+\d+\s+", "", normalized, flags=re.IGNORECASE).strip()
             low = normalized.casefold()
             if any(term in low for term in ("praia da costa", "praia de itaparica", "praia das gaivotas",
                                              "ataíde", "ataide", "nossa sra", "nossa senhora", "coqueiral",
@@ -487,7 +488,7 @@ def routes():
                 break
         if not neighborhood and len(parts) >= 3:
             candidate = parts[-3]
-            candidate = re.sub(r"^\d+\s*[-–]\s*", "", candidate).strip()
+            candidate = re.sub(r"^(?:(?:loja|lj|quiosque|box|sala)\s*)?\d+\s*[-–:]\s*", "", candidate, flags=re.IGNORECASE).strip()
             if candidate.casefold() not in {"brasil", "brazil", "espírito santo", "es", "vila velha"}:
                 neighborhood = candidate
         if not neighborhood:
