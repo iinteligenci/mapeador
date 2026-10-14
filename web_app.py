@@ -75,7 +75,7 @@ button{border:0;border-radius:10px;padding:12px 18px;background:var(--blue);colo
 <header>
  <div class="brand"><div class="mark">M</div><div><h1>Mapeador</h1><div class="category">Inteligência comercial para negócios alimentícios</div></div></div>
  <p class="sub">Encontre estabelecimentos, investigue sua presença digital e organize oportunidades para revisão humana.</p>
- <nav class="nav"><a href="/">＋ Nova prospecção</a><a href="/history">▤ Estabelecimentos encontrados</a><a href="/visits">📍 Visitas presenciais</a><a href="/removed">🚫 Removidos</a><a href="/campaigns">✉ Campanhas</a><a href="/automatic">⚙ Modo automático</a><a href="/proposals/4k">Propostas 4K</a><a href="/proposals/digital">Propostas presença digital</a></nav>
+ <nav class="nav"><a href="/">＋ Nova prospecção</a><a href="/history">▤ Estabelecimentos encontrados</a><a href="/visits">📍 Visitas presenciais</a><a href="/routes">🗺️ Rotas</a><a href="/removed">🚫 Removidos</a><a href="/campaigns">✉ Campanhas</a><a href="/automatic">⚙ Modo automático</a><a href="/proposals/4k">Propostas 4K</a><a href="/proposals/digital">Propostas presença digital</a></nav>
 </header>
 <section class="panel">
  <h2>Nova prospecção</h2>
@@ -460,6 +460,29 @@ def visits():
     return render_template_string(VISITS_PAGE, leads=leads, selected="in_person", labels=STATUS_LABELS)
 
 
+@app.get("/routes")
+def routes():
+    db_path = os.getenv("DATABASE_PATH", "data/mapeador.sqlite3")
+    init_db(db_path)
+    leads = [lead for lead in get_leads(path=db_path) if lead.get("status") == "in_person"]
+    groups_by_name = {}
+    for lead in leads:
+        address = (lead.get("address") or "").strip()
+        # Google Maps addresses commonly place the neighborhood after a comma.
+        parts = [part.strip() for part in address.split(",") if part.strip()]
+        neighborhood = ""
+        if len(parts) >= 3:
+            neighborhood = parts[-3]
+        elif len(parts) == 2:
+            neighborhood = parts[-2]
+        if not neighborhood or neighborhood.lower() in {"brasil", "brazil", "espírito santo", "es"}:
+            neighborhood = "Bairro não identificado"
+        groups_by_name.setdefault(neighborhood, []).append(lead)
+    groups = [{"name": name, "leads": sorted(items, key=lambda lead: (lead.get("name") or "").casefold())}
+              for name, items in sorted(groups_by_name.items(), key=lambda item: item[0].casefold())]
+    return render_template_string(ROUTES_PAGE, groups=groups, total=len(leads))
+
+
 @app.get("/removed")
 def removed():
     db_path = os.getenv("DATABASE_PATH", "data/mapeador.sqlite3")
@@ -491,7 +514,7 @@ HISTORY_PAGE = r"""
 main{max-width:1180px;margin:auto;padding:34px 22px 64px}.brand{display:flex;gap:12px;align-items:center}.mark{width:46px;height:46px;border-radius:14px;background:linear-gradient(135deg,#58b7ff,#5b6cff);display:grid;place-items:center;font-size:24px;font-weight:800}h1{font-size:27px;margin:0}.sub,.muted{color:var(--muted)}.panel{background:#121d30;border:1px solid var(--line);border-radius:16px;padding:20px;margin:18px 0}.nav{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0}.nav a{color:#b9dcff;text-decoration:none;border:1px solid #354761;background:#122039;padding:9px 13px;border-radius:10px}.filters{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 20px}.filters a{padding:8px 12px;border:1px solid var(--line);border-radius:9px;text-decoration:none;color:var(--text)}.filters a.active{background:#1c4772;border-color:#4da3ff}.entry{background:#0d1829;border:1px solid var(--line);border-radius:13px;padding:16px;margin:12px 0}.top{display:flex;justify-content:space-between;gap:12px;align-items:start}.entry h3{margin:0}.pill{border-radius:99px;padding:4px 10px;background:#18344f;color:#b9dcff;font-size:12px}.meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0}.meta div{overflow-wrap:anywhere}.meta b{display:block;font-size:12px;color:var(--muted);font-weight:500}a{color:#83c5ff}select,button{border:1px solid #354761;background:#0c1627;color:var(--text);padding:10px;border-radius:9px;font:inherit}.statusform{display:flex;gap:8px;flex-wrap:wrap;align-items:center;border-top:1px solid var(--line);padding-top:12px}.statusform button{background:var(--blue);color:#071321;font-weight:700;cursor:pointer}.empty{color:var(--muted);padding:22px 0}.hint{font-size:12px;color:var(--muted)}@media(max-width:650px){main{padding:20px 13px}.meta{grid-template-columns:1fr}.top{flex-direction:column}}
 </style></head><body><main>
 <header><div class="brand"><div class="mark">M</div><div><h1>Estabelecimentos encontrados</h1><div class="muted">Seu histórico comercial fica salvo no banco local.</div></div></div>
-<nav class="nav"><a href="/">＋ Nova prospecção</a><a href="/history">▤ Estabelecimentos encontrados</a><a href="/visits">📍 Visitas presenciais</a><a href="/removed">🚫 Removidos</a><a href="/campaigns">✉ Campanhas</a></nav></header>
+<nav class="nav"><a href="/">＋ Nova prospecção</a><a href="/history">▤ Estabelecimentos encontrados</a><a href="/visits">📍 Visitas presenciais</a><a href="/routes">🗺️ Rotas</a><a href="/removed">🚫 Removidos</a><a href="/campaigns">✉ Campanhas</a></nav></header>
 <section class="panel"><h2>{{ leads|length }} estabelecimento(s) nesta lista</h2>
 <div class="filters">
 <a href="/history" class="{{ 'active' if selected == 'all' else '' }}">Todos</a>
@@ -533,6 +556,27 @@ main{max-width:1180px;margin:auto;padding:34px 22px 64px}.brand{display:flex;gap
 <p class="hint">A busca ignora estabelecimentos já encontrados. Para criar uma mensagem, escolha a empresa e clique em “Gerar proposta”. O histórico fica neste computador, no banco SQLite local.</p>
 </section></main></body></html>
 """
+
+ROUTES_PAGE = r"""
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Mapeador | Rotas</title>
+<style>
+:root{color-scheme:dark;--line:#26354d;--muted:#a6b4ca;--text:#edf4ff;--blue:#4da3ff}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top left,#162b49 0,#0b1220 48%);font:15px/1.5 Segoe UI,Arial,sans-serif;color:var(--text)}
+main{max-width:1100px;margin:auto;padding:30px 18px 60px}.panel,.neighborhood{background:#121d30;border:1px solid var(--line);border-radius:14px;padding:18px;margin:14px 0}.muted{color:var(--muted)}.nav{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0}.nav a{color:#b9dcff;text-decoration:none;border:1px solid #354761;background:#122039;padding:9px 13px;border-radius:10px}.neighborhood summary{cursor:pointer;font-weight:750;font-size:17px}.count{color:#83c5ff;font-size:13px;margin-left:8px}.entry{border:1px solid var(--line);border-radius:10px;padding:14px;margin-top:12px;background:#0d1829}.entry h3{margin:0 0 5px}.meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:10px 0}.meta b{display:block;color:var(--muted);font-size:12px;font-weight:500}.meta div{overflow-wrap:anywhere}a{color:#83c5ff}.empty{padding:20px 0;color:var(--muted)}@media(max-width:650px){main{padding:18px 12px}.meta{grid-template-columns:1fr}}
+</style></head><body><main>
+<h1>🗺️ Rotas de visitas presenciais</h1><p class="muted">Estabelecimentos marcados como “Visita presencial”, organizados por bairro. Clique em um bairro para abrir a lista de locais.</p>
+<nav class="nav"><a href="/">Nova prospecção</a><a href="/history">Estabelecimentos encontrados</a><a href="/visits">Visitas presenciais</a><a href="/routes">Rotas</a><a href="/removed">Removidos</a><a href="/campaigns">Campanhas</a></nav>
+<section class="panel"><h2>{{ total }} estabelecimento(s) para visitar · {{ groups|length }} bairro(s)</h2>
+{% if not groups %}<div class="empty">Nenhum estabelecimento está marcado para visita presencial. No histórico, altere a etapa de um estabelecimento para “Visita presencial” para ele aparecer aqui.</div>{% endif %}
+{% for group in groups %}<details class="neighborhood" {% if groups|length == 1 %}open{% endif %}><summary>{{ group.name }} <span class="count">{{ group.leads|length }} local(is)</span></summary>
+{% for lead in group.leads %}<article class="entry"><h3>{{ lead.name }}</h3><div class="muted">{{ lead.category or "Categoria não identificada" }}</div>
+<div class="meta"><div><b>Endereço</b>{{ lead.address or "Endereço não identificado publicamente" }}</div><div><b>Telefone</b>{{ lead.phone or "Não identificado publicamente" }}</div><div><b>WhatsApp</b>{{ lead.contact_whatsapp or lead.contact_phone or "Não identificado publicamente" }}</div></div>
+{% if lead.address %}<a href="https://www.google.com/maps/search/?api=1&query={{ lead.address|urlencode }}" target="_blank" rel="noopener">Abrir endereço no Google Maps ↗</a>{% elif lead.link %}<a href="{{ lead.link }}" target="_blank" rel="noopener">Ver estabelecimento no Google Maps ↗</a>{% endif %}
+</article>{% endfor %}</details>{% endfor %}
+<p class="muted">O bairro é identificado a partir do endereço cadastrado. Quando não há informação suficiente, o estabelecimento fica em “Bairro não identificado” para evitar agrupamentos incorretos.</p>
+</section></main></body></html>
+"""
+
 
 REMOVED_PAGE = HISTORY_PAGE.replace("Mapeador | Estabelecimentos encontrados", "Mapeador | Removidos").replace("<h1>Estabelecimentos encontrados</h1>", "<h1>Estabelecimentos removidos</h1>").replace("Seu histórico comercial fica salvo no banco local.", "Lista de locais que você já conhece ou não pode atender. Ficam excluídos da prospecção e das campanhas.").replace("{{ leads|length }} estabelecimento(s) nesta lista", "{{ leads|length }} estabelecimento(s) removido(s)").replace('<div class="filters">', '<div class="filters" style="display:none">')
 
