@@ -43,6 +43,7 @@ def init_db(path: str | None = None) -> None:
                 link TEXT NOT NULL UNIQUE,
                 phone TEXT NOT NULL DEFAULT '',
                 website TEXT NOT NULL DEFAULT '',
+                address TEXT NOT NULL DEFAULT '',
                 score INTEGER,
                 justification TEXT NOT NULL DEFAULT '',
                 message TEXT NOT NULL DEFAULT '',
@@ -54,7 +55,7 @@ def init_db(path: str | None = None) -> None:
         # Novos campos opcionais: a migração preserva os bancos locais existentes.
         existing_columns = {row["name"] for row in conn.execute("PRAGMA table_info(leads)").fetchall()}
         for column in (
-            "contact_name", "contact_role", "contact_phone", "contact_whatsapp",
+            "address", "contact_name", "contact_role", "contact_phone", "contact_whatsapp",
             "contact_source", "contact_confidence", "contact_notes", "cnpj", "cnpj_source",
             "cnpj_checked_at", "contact_checked_at"
         ):
@@ -131,13 +132,14 @@ def save_lead(lead: dict[str, Any], path: str | None = None) -> tuple[int, bool]
     with _connect(path) as conn:
         existing = conn.execute("SELECT id FROM leads WHERE link = ?", (link,)).fetchone()
         conn.execute("""
-            INSERT INTO leads (name, category, link, phone, website)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO leads (name, category, link, phone, website, address)
+            VALUES (?, ?, ?, ?, ?, ?)
             ON CONFLICT(link) DO UPDATE SET
                 name = excluded.name,
                 category = CASE WHEN excluded.category <> '' THEN excluded.category ELSE leads.category END,
                 phone = CASE WHEN excluded.phone <> '' THEN excluded.phone ELSE leads.phone END,
                 website = CASE WHEN excluded.website <> '' THEN excluded.website ELSE leads.website END,
+                address = CASE WHEN excluded.address <> '' THEN excluded.address ELSE leads.address END,
                 updated_at = CURRENT_TIMESTAMP
         """, (
             name,
@@ -145,6 +147,7 @@ def save_lead(lead: dict[str, Any], path: str | None = None) -> tuple[int, bool]
             link,
             str(lead.get("phone") or "").strip(),
             str(lead.get("website") or "").strip(),
+            str(lead.get("address") or "").strip(),
         ))
         row = conn.execute("SELECT id FROM leads WHERE link = ?", (link,)).fetchone()
         return int(row["id"]), existing is None
