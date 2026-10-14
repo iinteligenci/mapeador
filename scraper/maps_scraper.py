@@ -166,3 +166,43 @@ async def search_google_maps(term: str, limit: int = 10, exclude_links: set[str]
             await context.close()
             await browser.close()
     return results[:limit]
+
+
+async def fetch_place_address(place_url: str) -> str:
+    """Abre a ficha exata de um local no Google Maps e tenta ler seu endereço público."""
+    place_url = _clean(place_url)
+    if not place_url.startswith("https://www.google.com/maps/"):
+        return ""
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        context = await browser.new_context(locale="pt-BR", viewport={"width": 1365, "height": 900})
+        page = await context.new_page()
+        try:
+            await page.goto(place_url, wait_until="domcontentloaded", timeout=18000)
+            selectors = [
+                'button[data-item-id="address"]',
+                '[data-item-id="address"]',
+                'button[aria-label*="Endereço"]',
+                'button[aria-label*="Address"]',
+                '[data-tooltip*="Endereço"]',
+                '[data-tooltip*="Address"]',
+            ]
+            for selector in selectors:
+                locator = page.locator(selector).first
+                try:
+                    if not await locator.count():
+                        continue
+                    value = _clean(await locator.get_attribute("aria-label", timeout=1800))
+                    if not value:
+                        value = _clean(await locator.get_attribute("data-tooltip", timeout=1800))
+                    if not value:
+                        value = _clean(await locator.inner_text(timeout=1800))
+                    value = re.sub(r"^(?:Endereço|Address|Copiar endereço|Copy address)\s*:?[\s]*", "", value, flags=re.IGNORECASE).strip()
+                    if value and value.casefold() not in {"endereço", "address", "copiar endereço", "copy address"}:
+                        return value
+                except Exception:
+                    continue
+            return ""
+        finally:
+            await context.close()
+            await browser.close()
