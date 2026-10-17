@@ -596,7 +596,17 @@ def visits():
     leads = [lead for lead in get_leads(path=db_path) if lead.get("status") == "in_person"]
     for lead in leads:
         lead["status_label"] = "Visita presencial"
-    return render_template_string(VISITS_PAGE, leads=leads, selected="in_person", labels=STATUS_LABELS)
+    # VISITS_PAGE reuses the establishment template, so provide its category context.
+    visit_categories = {"visits": "Visitas presenciais"}
+    return render_template_string(
+        VISITS_PAGE,
+        leads=leads,
+        grouped_leads={"visits": leads},
+        categories=visit_categories,
+        selected_group="visits",
+        selected="in_person",
+        labels=STATUS_LABELS,
+    )
 
 
 @app.get("/routes")
