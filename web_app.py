@@ -562,24 +562,31 @@ def history():
     selected = (request.args.get("status") or "all").strip()
     if selected not in {"all", "to_visit", "visited", "client"}:
         selected = "all"
-    selected_group = (request.args.get("group") or "others").strip()
-    if selected_group not in {"others", "distributors"}:
-        selected_group = "others"
+    categories = {"restaurants": "Restaurantes", "bars": "Bares e petiscarias", "distributors": "Distribuidoras", "butchers": "Açougues", "others": "Outros"}
+    selected_group = (request.args.get("group") or "restaurants").strip()
+    if selected_group not in categories:
+        selected_group = "restaurants"
     leads = [lead for lead in get_leads(path=db_path) if lead.get("status") not in {"in_person", "removed"}]
-    distributor_terms = ("distribuidora", "distribuidor", "distribuicao", "distribuição", "atacadista", "atacado", "food service", "foodservice")
     for lead in leads:
         if lead.get("status") not in STATUS_LABELS:
             lead["status"] = "to_visit"
         lead["status_label"] = STATUS_LABELS[lead["status"]]
         searchable = f"{lead.get('name', '')} {lead.get('category', '')}".casefold()
-        lead["business_group"] = "Distribuidoras" if any(term in searchable for term in distributor_terms) else "Outros estabelecimentos"
+        if any(term in searchable for term in ("distribuidora", "distribuidor", "distribuicao", "distribuição", "atacadista", "atacado", "food service", "foodservice")):
+            lead["business_group"] = "distributors"
+        elif any(term in searchable for term in ("açougue", "acougue", "casa de carnes", "casa das carnes", "boutique de carnes", "carnes e cortes")):
+            lead["business_group"] = "butchers"
+        elif any(term in searchable for term in ("petiscaria", "petiscos", "bar e restaurante", "bar restaurante", "bar", "pub", "boteco", "cervejaria")):
+            lead["business_group"] = "bars"
+        elif any(term in searchable for term in ("restaurante", "restaurant", "self-service", "self service", "churrascaria", "pizzaria", "lanchonete", "cantina", "bistrô", "bistro", "café", "cafe", "padaria")):
+            lead["business_group"] = "restaurants"
+        else:
+            lead["business_group"] = "others"
     if selected != "all":
         leads = [lead for lead in leads if lead["status"] == selected]
     leads.sort(key=lambda lead: str(lead.get("name") or "").casefold())
-    distributor_leads = [lead for lead in leads if lead["business_group"] == "Distribuidoras"]
-    other_leads = [lead for lead in leads if lead["business_group"] == "Outros estabelecimentos"]
-    visible_leads = distributor_leads if selected_group == "distributors" else other_leads
-    return render_template_string(HISTORY_PAGE, leads=visible_leads, distributor_leads=distributor_leads, other_leads=other_leads, selected=selected, selected_group=selected_group, labels=STATUS_LABELS)
+    grouped_leads = {key: [lead for lead in leads if lead["business_group"] == key] for key in categories}
+    return render_template_string(HISTORY_PAGE, leads=grouped_leads[selected_group], grouped_leads=grouped_leads, categories=categories, selected=selected, selected_group=selected_group, labels=STATUS_LABELS)
 
 
 @app.get("/visits")
@@ -815,9 +822,8 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
  <div class="nav-group"><span>AUTOMAÇÃO</span><a href="/automatic">⚙ Modo automático</a></div>
 </nav></header>
 <section class="panel"><h2>{{ leads|length }} estabelecimento(s) nesta lista</h2>
-<div class="filters">
-<a href="/history?group=others" class="{{ 'active' if selected_group == 'others' else '' }}">Outros estabelecimentos ({{ other_leads|length }})</a>
-<a href="/history?group=distributors" class="{{ 'active' if selected_group == 'distributors' else '' }}">Distribuidoras ({{ distributor_leads|length }})</a>
+<div class="filters category-filters" aria-label="Categorias de estabelecimentos">
+{% for key, label in categories.items() %}<a href="/history?group={{ key }}" class="{{ 'active' if selected_group == key else '' }}">{{ label }} ({{ grouped_leads[key]|length }})</a>{% endfor %}
 </div>
 <div class="filters">
 <a href="/history?group={{ selected_group }}" class="{{ 'active' if selected == 'all' else '' }}">Todos</a>
@@ -826,9 +832,9 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
 <a href="/history?group={{ selected_group }}&status=client" class="{{ 'active' if selected == 'client' else '' }}">Clientes</a>
 </div>
 {% if not leads %}<div class="empty">Nenhum estabelecimento nesta categoria ainda. Faça uma busca para adicionar negócios ao histórico.</div>{% endif %}
-{% if selected_group == "distributors" and distributor_leads %}<section class="panel business-category" style="margin-top:18px;border-color:#315a83!important">
-<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><h2 style="margin:0">Distribuidoras</h2><span class="pill">Distribuição e atacado · {{ distributor_leads|length }}</span></div>
-{% for lead in distributor_leads %}
+{% if leads %}<section class="panel business-category" style="margin-top:18px;border-color:#315a83!important">
+<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><h2 style="margin:0">{{ categories[selected_group] }}</h2><span class="pill">{{ categories[selected_group] }} · {{ leads|length }}</span></div>
+{% for lead in leads %}
 <article class="entry">
 <div class="top"><div><h3>{{ lead.name }}</h3><div class="muted">{{ lead.category or "Categoria não identificada" }}</div></div><span class="pill">{{ lead.status_label }}</span></div>
 <div class="meta">
@@ -854,14 +860,14 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
 <select id="history-proposal-{{lead.id}}" name="proposal_profile"><option value="4k">4K Food Service</option><option value="digital">Presença digital</option><option value="both">Ambas as empresas</option></select>
 <input name="proposal_offer" placeholder="Oferta personalizada (opcional)" style="max-width:260px">
 <button type="submit">Gerar proposta</button></form>
-<form class="statusform" method="post" action="/status"><input type="hidden" name="lead_id" value="{{lead.id}}"><input type="hidden" name="return_to" value="history"><input type="hidden" name="selected" value="{{selected}}"><input type="hidden" name="group" value="{{selected_group}}">
+<form class="statusform" method="post" action="/status"><input type="hidden" name="lead_id" value="{{lead.id}}"><input type="hidden" name="return_to" value="history"><input type="hidden" name="selected" value="{{selected}}"><input type="hidden" name="group" value="{{selected_group}}"><input type="hidden" name="group" value="{{selected_group}}">
 <label for="history-status-{{lead.id}}" class="muted">Alterar etapa:</label>
 <select id="history-status-{{lead.id}}" name="status">{% for value,label in labels.items() %}<option value="{{value}}" {% if lead.status == value %}selected{% endif %}>{{label}}</option>{% endfor %}</select>
 <button type="submit">Salvar</button></form>
 </article>
 {% endfor %}
 </section>{% endif %}
-{% if selected_group == "others" and other_leads %}<section class="panel business-category" style="margin-top:18px">
+{% if false %}<section class="panel business-category" style="margin-top:18px">
 <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><h2 style="margin:0">Outros estabelecimentos</h2><span class="pill">Restaurantes, bares, açougues e outros · {{ other_leads|length }}</span></div>
 {% for lead in other_leads %}
 <article class="entry">
@@ -896,7 +902,7 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
 </article>
 {% endfor %}
 </section>{% endif %}
-<p class="hint">Distribuidoras e outros estabelecimentos são exibidos em listas separadas. A classificação automática usa o nome e a categoria pública encontrados; confira cadastros com poucas informações.</p>
+<p class="hint">Cada categoria possui sua própria lista. A classificação automática usa o nome e a categoria pública encontrados; confira cadastros com poucas informações.</p>
 <p class="hint">A busca ignora estabelecimentos já encontrados. Para criar uma mensagem, escolha a empresa e clique em “Gerar proposta”. O histórico fica neste computador, no banco SQLite local.</p>
 </section></main>
 <script>
