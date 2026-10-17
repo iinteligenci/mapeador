@@ -135,19 +135,28 @@ def analyze_lead_profiles(lead: dict[str, Any], profiles: list[str], custom_offe
     if "4k" in selected:
         profiles_text.append(
             '"4k": {"score": 0, "justificativa": "...", "mensagem": "..."} '
-            '(fornecimento B2B da 4K Food Service: avalie apenas indícios públicos de aderência '
-            'a distribuidor de alimentos; não invente volume de compra, fornecedores ou demanda)'
+            '(fornecimento B2B da 4K Food Service: avalie aderência pública ao fornecimento de alimentos, '
+            'compatibilidade da categoria/cardápio e se há canal comercial verificável; não invente volume, '
+            'fornecedor, necessidade ou intenção de compra)'
         )
     if "digital" in selected:
         profiles_text.append(
             '"digital": {"score": 0, "justificativa": "...", "mensagem": "..."} '
-            '(serviços de presença digital: site, cardápio, pedidos online, redes sociais e atendimento)'
+            '(serviços de presença digital: site, cardápio, pedidos online, redes sociais e atendimento; '
+            'cite apenas oportunidades concretas sustentadas pelos dados públicos, sem inventar falhas)'
         )
     prompt = f"""
-Você qualifica oportunidades B2B no Brasil usando apenas dados públicos. Não invente fatos.
+Você é o analista de priorização comercial do Mapeador para prospecção B2B no Brasil.
+Use somente dados públicos fornecidos; não invente fatos, necessidades, fornecedores, orçamento ou intenção de compra.
 Ausência de evidência pública não prova que a empresa não use uma ferramenta.
-Mensagem respeitosa, curta (máximo 65 palavras), sem pressão, terminando em pergunta simples.
-Use [NOME DA SUA EMPRESA] como marcador. Score de 0 a 100 é prioridade preliminar para revisão humana.
+O score de 0 a 100 deve estimar PRIORIDADE DE ABORDAGEM / chance relativa de conseguir uma resposta inicial,
+não a chance comprovada de fechar venda. Baseie-se em sinais observáveis: aderência entre negócio e oferta,
+dados específicos que permitam personalização, canal de contato comercial verificável, presença de cardápio/
+catálogo ou canais digitais relevantes, qualidade/consistência dos dados e possibilidade de fazer uma pergunta
+curta e pertinente. Não premie simplesmente o tamanho da empresa nem penalize automaticamente dados ausentes.
+Na justificativa, cite os sinais positivos e a principal incerteza. Evite afirmar que um contato responderá.
+Mensagem respeitosa, individualizada, curta (máximo 65 palavras), sem pressão, terminando em pergunta simples.
+Use [NOME DA SUA EMPRESA] como marcador. Não ofereça descontos nem condições não informadas.
 Oferta complementar informada pelo usuário: {custom_offer or "nenhuma"}
 Empresa/dados públicos: {json.dumps(safe_lead, ensure_ascii=False)}
 Retorne SOMENTE JSON válido, com estas chaves e nenhum texto fora do JSON:
