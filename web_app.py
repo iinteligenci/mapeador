@@ -1584,7 +1584,13 @@ def proposals_page(profile: str):
         raw_value = str(proposal.get("contact_value") or "").strip()
         contact_type = str(proposal.get("contact_type") or "").lower()
         if "@" in raw_value and not raw_value.startswith("@"):
-            proposal["email_url"] = "mailto:" + quote(raw_value, safe="@.+-_")
+            subject = "Contato comercial — " + ("4K Food Service" if proposal.get("profile") == "4k" else "Presença digital")
+            body = str(proposal.get("message") or "")
+            proposal["email_url"] = (
+                "mailto:" + quote(raw_value, safe="@.+-_")
+                + "?subject=" + quote(subject)
+                + "&body=" + quote(body)
+            )
         digits = re.sub(r"\D", "", raw_value)
         if digits and ("whatsapp" in contact_type or "telefone" in contact_type or "phone" in contact_type):
             if len(digits) in (10, 11):
