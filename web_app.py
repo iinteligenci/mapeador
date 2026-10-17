@@ -17,7 +17,7 @@ from flask import Flask, redirect, render_template_string, request, url_for, abo
 from ai_agent.analyzer import analyze_lead_profiles
 from ai_agent.research_planner import plan_deep_searches
 from ai_agent.deep_enrichment import enrich_business_with_ai
-from database.db import (get_leads, init_db, save_lead, update_analysis, update_lead_status, update_public_contacts, update_business_identity, save_campaign, get_campaigns, queue_campaign, get_campaign_leads, update_campaign_event, get_automation_settings, set_automation_settings, save_proposal, get_proposals)
+from database.db import (get_leads, init_db, save_lead, update_analysis, update_lead_status, update_public_contacts, update_business_identity, save_campaign, get_campaigns, queue_campaign, get_campaign_leads, update_campaign_event, get_automation_settings, set_automation_settings, save_proposal, get_proposals, save_sales_example, get_sales_examples)\nfrom ai_agent.sales_agent import draft_sales_reply
 from scraper.maps_scraper import search_google_maps, fetch_place_address
 from scraper.public_contacts import find_public_business_contacts
 from scraper.site_research import research_public_site
@@ -175,7 +175,7 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
  <nav class="nav" aria-label="Navegação principal">
  <div class="nav-group"><span>PROSPECÇÃO</span><a href="/">＋ Nova prospecção</a><a href="/history">▤ Estabelecimentos</a><a href="/removed">🚫 Removidos</a></div>
  <div class="nav-group"><span>CAMPO</span><a href="/visits">📍 Visitas presenciais</a><a href="/routes">🗺️ Rotas</a></div>
- <div class="nav-group"><span>COMERCIAL</span><a href="/campaigns">✉ Campanhas</a><a href="/proposals/4k">Propostas 4K</a><a href="/proposals/digital">Propostas presença digital</a></div>
+ <div class="nav-group"><span>COMERCIAL</span><a href="/campaigns">✉ Campanhas</a><a href="/proposals/4k">Propostas 4K</a><a href="/proposals/digital">Propostas presença digital</a></div>\n <div class="nav-group"><span>VENDA COM IA</span><a href="/seller">🤝 Agente vendedor</a></div>
  <div class="nav-group"><span>AUTOMAÇÃO</span><a href="/automatic">⚙ Modo automático</a></div>
 </nav>
 </header>
@@ -543,6 +543,117 @@ def generate_proposal():
     )
 
 
+
+SELLER_PAGE = r"""
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mapeador | Agente vendedor</title>
+<style>
+.seller-grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(280px,.8fr);gap:18px}
+.seller-field{margin:12px 0}.seller-field label{display:block;margin-bottom:6px;color:#91a3bd;font-size:12px;font-weight:650}
+.seller-field input,.seller-field select,.seller-field textarea{width:100%;box-sizing:border-box;background:#0a1322;color:#e8eef8;border:1px solid #2a3b54;border-radius:9px;padding:11px;font:inherit}
+.seller-field textarea{min-height:110px;resize:vertical}
+.seller-result{border:1px solid #2a4563;background:#0c1a2c;border-radius:12px;padding:16px;margin-top:14px}
+.seller-result pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;margin:8px 0}
+.seller-badge{display:inline-block;padding:5px 9px;border-radius:99px;background:#183b32;color:#8ce3c6;font-size:11px;font-weight:750}
+.example{padding:13px 0;border-bottom:1px solid #24334a}.example:last-child{border-bottom:0}
+@media(max-width:900px){.seller-grid{grid-template-columns:1fr}}
+</style></head><body><main>
+<header><div class="brand"><div class="mark">M</div><div><h1>Agente vendedor</h1><div class="category">Assistente de negociação com IA</div></div></div>
+<p class="sub">Prepare respostas naturais para leads, trate objeções e aproveite exemplos de atendimentos reais para orientar o estilo de venda.</p>
+<nav class="nav" aria-label="Navegação principal">
+ <div class="nav-group"><span>PROSPECÇÃO</span><a href="/">＋ Nova prospecção</a><a href="/history">▤ Estabelecimentos</a><a href="/removed">🚫 Removidos</a></div>
+ <div class="nav-group"><span>CAMPO</span><a href="/visits">📍 Visitas presenciais</a><a href="/routes">🗺️ Rotas</a></div>
+ <div class="nav-group"><span>COMERCIAL</span><a href="/campaigns">✉ Campanhas</a><a href="/proposals/4k">Propostas 4K</a><a href="/proposals/digital">Propostas presença digital</a></div>
+ <div class="nav-group"><span>VENDA COM IA</span><a href="/seller" aria-current="page">🤝 Agente vendedor</a></div>
+ <div class="nav-group"><span>AUTOMAÇÃO</span><a href="/automatic">⚙ Modo automático</a></div>
+</nav></header>
+{% if error %}<div class="alert">{{ error }}</div>{% endif %}
+<div class="seller-grid">
+<section class="panel">
+ <h2>Preparar resposta para um cliente</h2>
+ <p class="muted">Cole a mensagem recebida e, se necessário, o histórico. A IA cria um rascunho para você revisar — nada é enviado automaticamente.</p>
+ <form method="post" action="/seller/reply">
+  <div class="seller-field"><label for="lead_id">Lead do Mapeador (opcional)</label><select id="lead_id" name="lead_id"><option value="">Cliente fora do histórico / preencher manualmente</option>{% for lead in leads %}<option value="{{lead.id}}" {% if selected_lead == lead.id|string %}selected{% endif %}>{{lead.name}}{% if lead.category %} — {{lead.category}}{% endif %}</option>{% endfor %}</select></div>
+  <div class="seller-field"><label for="profile">O que estamos vendendo?</label><select id="profile" name="profile"><option value="4k" {% if profile == '4k' %}selected{% endif %}>4K Food Service — fornecimento de alimentos para empresas</option><option value="digital" {% if profile == 'digital' %}selected{% endif %}>Serviços de presença digital</option><option value="dornelas" {% if profile == 'dornelas' %}selected{% endif %}>Charcutaria Dornelas — venda ao consumidor</option></select></div>
+  <div class="seller-field"><label for="offer_details">Informações comerciais autorizadas (preços, limites e condições)</label><textarea id="offer_details" name="offer_details" placeholder="Ex.: catálogo, preços confirmados, área de entrega, condições autorizadas...">{{offer_details}}</textarea></div>
+  <div class="seller-field"><label for="context">Histórico anterior (opcional)</label><textarea id="context" name="context" placeholder="Cole as mensagens anteriores para a IA entender o contexto.">{{context}}</textarea></div>
+  <div class="seller-field"><label for="customer_message">Última mensagem recebida do cliente</label><textarea id="customer_message" name="customer_message" required placeholder="Cole aqui a mensagem do cliente...">{{customer_message}}</textarea></div>
+  <button type="submit">✦ Preparar resposta</button>
+ </form>
+ {% if draft %}
+ <div class="seller-result"><span class="seller-badge">Rascunho para revisão</span><h3>Resposta sugerida</h3><pre id="replyText">{{draft.resposta}}</pre><button type="button" onclick="navigator.clipboard.writeText(document.getElementById('replyText').innerText)">Copiar resposta</button>
+ <h3>Próximo passo sugerido</h3><p>{{draft.objetivo_proximo_passo or 'Continuar a conversa de acordo com a resposta do cliente.'}}</p>
+ {% if draft.dados_a_confirmar %}<h3>Antes de enviar, confirme</h3><p>{{draft.dados_a_confirmar}}</p>{% endif %}</div>
+ {% endif %}
+</section>
+<section class="panel">
+ <h2>Ensinar pelo exemplo</h2>
+ <p class="muted">Cadastre atendimentos reais e a resposta que você considera boa. O agente consulta esses exemplos em futuras respostas; isso não altera nem treina o modelo-base.</p>
+ <form method="post" action="/seller/examples">
+  <div class="seller-field"><label for="example_title">Título / tipo de objeção</label><input id="example_title" name="title" placeholder="Ex.: cliente achou caro, pediu desconto"></div>
+  <div class="seller-field"><label for="conversation">Conversa real (remova dados pessoais desnecessários)</label><textarea id="conversation" name="conversation" required placeholder="Cliente: ...&#10;Vendedor: ..."></textarea></div>
+  <div class="seller-field"><label for="preferred_reply">Resposta aprovada / abordagem que funcionou</label><textarea id="preferred_reply" name="preferred_reply" required placeholder="Escreva a resposta que o agente deve usar como referência."></textarea></div>
+  <div class="seller-field"><label for="notes">O que funcionou e limites de negociação (opcional)</label><textarea id="notes" name="notes" placeholder="Ex.: não conceder desconto; oferecer alternativa de volume."></textarea></div>
+  <button type="submit">Salvar exemplo de venda</button>
+ </form>
+ <h3>Exemplos salvos ({{examples|length}} recentes)</h3>
+ {% if examples %}{% for example in examples %}<div class="example"><strong>{{example.title or 'Atendimento sem título'}}</strong><div class="muted">{{example.created_at}}</div><div>{{example.preferred_reply[:240]}}</div></div>{% endfor %}{% else %}<p class="muted">Nenhum exemplo cadastrado ainda. Você pode começar com uma conversa em que conseguiu avançar ou fechar a venda.</p>{% endif %}
+</section></div>
+<p class="note">Fase inicial: a IA prepara mensagens, mas não envia nem negocia condições sem sua revisão. A integração de envio automático será uma etapa separada.</p>
+</main></body></html>
+"""
+
+
+
+@app.get("/seller")
+def seller_page():
+    db_path = os.getenv("DATABASE_PATH", "data/mapeador.sqlite3")
+    leads = [lead for lead in get_leads(path=db_path) if lead.get("status") not in {"removed", "in_person"}]
+    return render_template_string(SELLER_PAGE, leads=leads[:300], examples=get_sales_examples(path=db_path),
+        error=None, draft=None, selected_lead="", profile="4k", offer_details="", context="", customer_message="")
+
+
+@app.post("/seller/reply")
+def seller_reply():
+    db_path = os.getenv("DATABASE_PATH", "data/mapeador.sqlite3")
+    leads = [lead for lead in get_leads(path=db_path) if lead.get("status") not in {"removed", "in_person"}]
+    selected = (request.form.get("lead_id") or "").strip()
+    saved = next((lead for lead in leads if str(lead.get("id")) == selected), None)
+    profile = (request.form.get("profile") or "4k").strip()
+    if profile not in {"4k", "digital", "dornelas"}:
+        profile = "4k"
+    context = (request.form.get("context") or "").strip()[:5000]
+    customer_message = (request.form.get("customer_message") or "").strip()[:5000]
+    offer_details = (request.form.get("offer_details") or "").strip()[:2500]
+    error = None
+    draft = None
+    try:
+        draft = draft_sales_reply(saved or {}, customer_message, profile, offer_details, context, db_path)
+    except Exception as exc:
+        error = str(exc) if isinstance(exc, (ValueError, RuntimeError)) else "Não foi possível preparar a resposta. Confira a configuração da IA e tente novamente."
+    return render_template_string(SELLER_PAGE, leads=leads[:300], examples=get_sales_examples(path=db_path),
+        error=error, draft=draft, selected_lead=selected, profile=profile, offer_details=offer_details,
+        context=context, customer_message=customer_message)
+
+
+@app.post("/seller/examples")
+def seller_save_example():
+    db_path = os.getenv("DATABASE_PATH", "data/mapeador.sqlite3")
+    try:
+        save_sales_example(
+            conversation=request.form.get("conversation", ""),
+            preferred_reply=request.form.get("preferred_reply", ""),
+            title=request.form.get("title", ""),
+            notes=request.form.get("notes", ""),
+            path=db_path,
+        )
+    except ValueError as exc:
+        leads = [lead for lead in get_leads(path=db_path) if lead.get("status") not in {"removed", "in_person"}]
+        return render_template_string(SELLER_PAGE, leads=leads[:300], examples=get_sales_examples(path=db_path),
+            error=str(exc), draft=None, selected_lead="", profile="4k", offer_details="", context="", customer_message=""), 400
+    return redirect(url_for("seller_page"))
+
+
 STATUS_LABELS = {
     "to_visit": "Para visitar",
     "visited": "Visitado",
@@ -798,7 +909,7 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
 <nav class="nav" aria-label="Navegação principal">
  <div class="nav-group"><span>PROSPECÇÃO</span><a href="/">＋ Nova prospecção</a><a href="/history">▤ Estabelecimentos</a><a href="/removed">🚫 Removidos</a></div>
  <div class="nav-group"><span>CAMPO</span><a href="/visits">📍 Visitas presenciais</a><a href="/routes">🗺️ Rotas</a></div>
- <div class="nav-group"><span>COMERCIAL</span><a href="/campaigns">✉ Campanhas</a><a href="/proposals/4k">Propostas 4K</a><a href="/proposals/digital">Propostas presença digital</a></div>
+ <div class="nav-group"><span>COMERCIAL</span><a href="/campaigns">✉ Campanhas</a><a href="/proposals/4k">Propostas 4K</a><a href="/proposals/digital">Propostas presença digital</a></div>\n <div class="nav-group"><span>VENDA COM IA</span><a href="/seller">🤝 Agente vendedor</a></div>
  <div class="nav-group"><span>AUTOMAÇÃO</span><a href="/automatic">⚙ Modo automático</a></div>
 </nav></header>
 <section class="panel"><h2>{{ leads|length }} estabelecimento(s) nesta lista</h2>
@@ -967,7 +1078,7 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
 <nav class="nav" aria-label="Navegação principal">
  <div class="nav-group"><span>PROSPECÇÃO</span><a href="/">＋ Nova prospecção</a><a href="/history">▤ Estabelecimentos</a><a href="/removed">🚫 Removidos</a></div>
  <div class="nav-group"><span>CAMPO</span><a href="/visits">📍 Visitas presenciais</a><a href="/routes">🗺️ Rotas</a></div>
- <div class="nav-group"><span>COMERCIAL</span><a href="/campaigns">✉ Campanhas</a><a href="/proposals/4k">Propostas 4K</a><a href="/proposals/digital">Propostas presença digital</a></div>
+ <div class="nav-group"><span>COMERCIAL</span><a href="/campaigns">✉ Campanhas</a><a href="/proposals/4k">Propostas 4K</a><a href="/proposals/digital">Propostas presença digital</a></div>\n <div class="nav-group"><span>VENDA COM IA</span><a href="/seller">🤝 Agente vendedor</a></div>
  <div class="nav-group"><span>AUTOMAÇÃO</span><a href="/automatic">⚙ Modo automático</a></div>
 </nav>
 <section class="panel"><h2>{{ total }} estabelecimento(s) para visitar · {{ groups|length }} bairro(s)</h2>
@@ -1108,7 +1219,7 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
 </style></head><body><main><h1>Central de campanhas</h1><p class="muted">Você cria e revisa a mensagem. A abertura do WhatsApp é manual; nada é enviado automaticamente.</p><nav class="nav" aria-label="Navegação principal">
  <div class="nav-group"><span>PROSPECÇÃO</span><a href="/">＋ Nova prospecção</a><a href="/history">▤ Estabelecimentos</a><a href="/removed">🚫 Removidos</a></div>
  <div class="nav-group"><span>CAMPO</span><a href="/visits">📍 Visitas presenciais</a><a href="/routes">🗺️ Rotas</a></div>
- <div class="nav-group"><span>COMERCIAL</span><a href="/campaigns">✉ Campanhas</a><a href="/proposals/4k">Propostas 4K</a><a href="/proposals/digital">Propostas presença digital</a></div>
+ <div class="nav-group"><span>COMERCIAL</span><a href="/campaigns">✉ Campanhas</a><a href="/proposals/4k">Propostas 4K</a><a href="/proposals/digital">Propostas presença digital</a></div>\n <div class="nav-group"><span>VENDA COM IA</span><a href="/seller">🤝 Agente vendedor</a></div>
  <div class="nav-group"><span>AUTOMAÇÃO</span><a href="/automatic">⚙ Modo automático</a></div>
 </nav>
 <section class="panel"><h2>Nova campanha</h2><form method="post" action="/campaigns/create">
@@ -1365,7 +1476,7 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
 <nav class="nav" aria-label="Navegação principal">
  <div class="nav-group"><span>PROSPECÇÃO</span><a href="/">＋ Nova prospecção</a><a href="/history">▤ Estabelecimentos</a><a href="/removed">🚫 Removidos</a></div>
  <div class="nav-group"><span>CAMPO</span><a href="/visits">📍 Visitas presenciais</a><a href="/routes">🗺️ Rotas</a></div>
- <div class="nav-group"><span>COMERCIAL</span><a href="/campaigns">✉ Campanhas</a><a href="/proposals/4k">Propostas 4K</a><a href="/proposals/digital">Propostas presença digital</a></div>
+ <div class="nav-group"><span>COMERCIAL</span><a href="/campaigns">✉ Campanhas</a><a href="/proposals/4k">Propostas 4K</a><a href="/proposals/digital">Propostas presença digital</a></div>\n <div class="nav-group"><span>VENDA COM IA</span><a href="/seller">🤝 Agente vendedor</a></div>
  <div class="nav-group"><span>AUTOMAÇÃO</span><a href="/automatic">⚙ Modo automático</a></div>
 </nav>
 <section class="panel"><h2>Controle da automação</h2><p><strong>Status:</strong> <span style="color:{{ '#35d49a' if settings.enabled else '#ffcc80' }};font-weight:800">{{ 'LIGADO' if settings.enabled else 'DESLIGADO' }}</span></p>
@@ -1501,7 +1612,7 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
 <h1>Propostas geradas automaticamente</h1><nav class="nav" aria-label="Navegação principal">
  <div class="nav-group"><span>PROSPECÇÃO</span><a href="/">＋ Nova prospecção</a><a href="/history">▤ Estabelecimentos</a><a href="/removed">🚫 Removidos</a></div>
  <div class="nav-group"><span>CAMPO</span><a href="/visits">📍 Visitas presenciais</a><a href="/routes">🗺️ Rotas</a></div>
- <div class="nav-group"><span>COMERCIAL</span><a href="/campaigns">✉ Campanhas</a><a href="/proposals/4k">Propostas 4K</a><a href="/proposals/digital">Propostas presença digital</a></div>
+ <div class="nav-group"><span>COMERCIAL</span><a href="/campaigns">✉ Campanhas</a><a href="/proposals/4k">Propostas 4K</a><a href="/proposals/digital">Propostas presença digital</a></div>\n <div class="nav-group"><span>VENDA COM IA</span><a href="/seller">🤝 Agente vendedor</a></div>
  <div class="nav-group"><span>AUTOMAÇÃO</span><a href="/automatic">⚙ Modo automático</a></div>
 </nav>
 <div class="tabs"><a class="{{'active' if profile == '4k' else ''}}" href="/proposals/4k">4K Food Service ({{count4k}})</a><a class="{{'active' if profile == 'digital' else ''}}" href="/proposals/digital">Presença digital ({{countdigital}})</a></div>
