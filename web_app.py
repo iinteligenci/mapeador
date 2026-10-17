@@ -1509,10 +1509,16 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
 </nav>
 <div class="tabs"><a class="{{'active' if profile == '4k' else ''}}" href="/proposals/4k">4K Food Service ({{count4k}})</a><a class="{{'active' if profile == 'digital' else ''}}" href="/proposals/digital">Presença digital ({{countdigital}})</a></div>
 <p class="muted">Cada cartão é um rascunho separado por empresa e canal público encontrado. Nenhuma mensagem foi enviada.</p>
-{% for p in proposals %}<article class="entry"><h2>{{p.lead_name}}</h2><p class="muted">{{p.category}} · {{'4K Food Service' if p.profile == '4k' else 'Presença digital'}} · Prioridade preliminar {{p.score}}/100</p>
-<p><strong>Canal:</strong> {{p.contact_type}} · {{p.contact_value or 'Contato comercial público'}}</p><p>{{p.justification}}</p><div class="draft">{{p.message}}</div>
-{% if p.source_url %}<p><a href="{{p.source_url}}" target="_blank" rel="noopener">Ver fonte pública do contato</a></p>{% endif %}
-<p class="muted">Rascunho salvo em {{p.created_at}}. Revise os dados, a adequação da oferta e a base legal antes de qualquer abordagem.</p></article>{% else %}<p class="muted">Ainda não há propostas para esta empresa. Ative o modo automático e aguarde a pesquisa e a coleta de contatos públicos.</p>{% endfor %}
+{% for p in proposals %}<article class="entry"><h2>{{p.lead_name}}</h2><p class="muted">{{p.category}} · {{'4K Food Service' if p.profile == '4k' else 'Presença digital'}} · Prioridade de abordagem: <strong>{{p.score}}/100</strong></p>
+<p><strong>Canal encontrado:</strong> {{p.contact_type}} · {{p.contact_value or 'Contato comercial público'}}</p><p>{{p.justification}}</p><div class="draft">{{p.message}}</div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+{% if p.whatsapp_url %}<a class="btn" href="{{p.whatsapp_url}}" target="_blank" rel="noopener">Abrir WhatsApp com mensagem</a>{% endif %}
+{% if p.email_url %}<a class="btn" href="{{p.email_url}}" target="_blank" rel="noopener">Preparar e-mail</a>{% endif %}
+{% if p.phone_url %}<a class="btn" href="{{p.phone_url}}">Ligar</a>{% endif %}
+{% if p.maps_url %}<a class="btn" href="{{p.maps_url}}" target="_blank" rel="noopener">Ver no Google Maps</a>{% endif %}
+{% if p.source_url %}<a class="btn" href="{{p.source_url}}" target="_blank" rel="noopener">Fonte do contato</a>{% endif %}
+</div>
+<p class="muted">Rascunho preparado automaticamente em {{p.created_at}}. A pontuação é uma estimativa baseada nos dados públicos encontrados, não uma garantia de resposta. Revise a mensagem e a base legal antes de abordar. Nada é enviado automaticamente.</p></article>{% else %}<p class="muted">Ainda não há propostas para esta empresa. Ative o modo automático e aguarde a pesquisa e a coleta de contatos públicos.</p>{% endfor %}
 </main>
 <script>
 /* Navegação contextual: sempre destaca a área atual do fluxo */
@@ -1570,6 +1576,31 @@ def proposals_page(profile: str):
         return "Empresa inválida.", 404
     db_path = os.getenv("DATABASE_PATH", "data/mapeador.sqlite3")
     all_proposals = get_proposals(path=db_path)
+    # Prepare reviewed, user-triggered outreach links; never send automatically.
+    for proposal in all_proposals:
+        proposal["whatsapp_url"] = ""
+        proposal["email_url"] = ""
+        proposal["phone_url"] = ""
+        raw_value = str(proposal.get("contact_value") or "").strip()
+        contact_type = str(proposal.get("contact_type") or "").lower()
+        if "@" in raw_value and not raw_value.startswith("@"):
+            proposal["email_url"] = "mailto:" + quote(raw_value, safe="@.+-_")
+        digits = re.sub(r"\\D", "", raw_value)
+        if digits and ("whatsapp" in contact_type or "telefone" in contact_type or "phone" in contact_type):
+            if len(digits) in (10, 11):
+                digits = "55" + digits
+            if len(digits) >= 12 and len(digits) <= 13:
+                proposal["whatsapp_url"] = "https://wa.me/" + digits + "?text=" + quote(str(proposal.get("message") or ""))
+            proposal["phone_url"] = "tel:+" + digits
+        if not proposal["whatsapp_url"]:
+            fallback = str(proposal.get("contact_whatsapp") or proposal.get("contact_phone") or "").strip()
+            fallback_digits = re.sub(r"\\D", "", fallback)
+            if fallback_digits:
+                if len(fallback_digits) in (10, 11):
+                    fallback_digits = "55" + fallback_digits
+                if 12 <= len(fallback_digits) <= 13:
+                    proposal["whatsapp_url"] = "https://wa.me/" + fallback_digits + "?text=" + quote(str(proposal.get("message") or ""))
+        proposal["maps_url"] = str(proposal.get("maps_url") or "")
     proposals = [p for p in all_proposals if p.get("profile") == profile]
     return render_template_string(PROPOSALS_PAGE, profile=profile, proposals=proposals,
         count4k=sum(1 for p in all_proposals if p.get("profile") == "4k"),
