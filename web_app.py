@@ -662,8 +662,25 @@ def routes():
         groups_by_name.setdefault(key, {"name": neighborhood, "leads": []})["leads"].append(lead)
     groups = [{"name": group["name"], "leads": sorted(group["leads"], key=lambda lead: (lead.get("name") or "").casefold())}
               for group in sorted(groups_by_name.values(), key=lambda item: item["name"].casefold())]
+    all_lines = ["MAPEADOR — ROTAS DE VISITAS", f"Total: {len(leads)} estabelecimento(s)", ""]
+    for group in groups:
+        all_lines.append(f"BAIRRO: {group['name']} ({len(group['leads'])} local(is))")
+        group_lines = [f"ROTA DE VISITAS — {group['name']}", ""]
+        for lead in group["leads"]:
+            address = str(lead.get("address") or "Endereço não identificado")
+            map_url = str(lead.get("link") or ("https://www.google.com/maps/search/?api=1&query=" + quote(address)))
+            phone = lead.get("contact_whatsapp") or lead.get("contact_phone") or lead.get("phone") or ""
+            lines = [f"• {lead.get('name') or 'Estabelecimento'}", f"  Endereço: {address}"]
+            if phone:
+                lines.append(f"  Telefone: {phone}")
+            lines.append(f"  Mapa: {map_url}")
+            all_lines.extend(lines)
+            group_lines.extend(lines)
+        all_lines.append("")
+        group["share_url"] = "https://wa.me/?text=" + quote("\\n".join(group_lines))
+    all_share_url = "https://wa.me/?text=" + quote("\\n".join(all_lines))
     message = request.args.get("message", "")
-    return render_template_string(ROUTES_PAGE, groups=groups, total=len(leads), message=message)
+    return render_template_string(ROUTES_PAGE, groups=groups, total=len(leads), message=message, all_share_url=all_share_url)
 
 
 @app.post("/routes/refresh-addresses")
@@ -1045,10 +1062,13 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
  <div class="nav-group"><span>AUTOMAÇÃO</span><a href="/automatic">⚙ Modo automático</a></div>
 </nav>
 <section class="panel"><h2>{{ total }} estabelecimento(s) para visitar · {{ groups|length }} bairro(s)</h2>
+<p class="muted">Prepare um resumo para enviar pelo WhatsApp. Você escolhe a conversa e confirma o envio; nenhuma mensagem é disparada sozinha.</p>
+<p><a class="btn" href="{{ all_share_url }}" target="_blank" rel="noopener">Compartilhar todas as rotas no WhatsApp</a></p>
 <form method="post" action="/routes/refresh-addresses"><button type="submit" style="background:#4da3ff;color:#071321;border:0;border-radius:9px;padding:11px 15px;font-weight:700;cursor:pointer">Buscar endereços diretamente no Google Maps</button></form>
 {% if message %}<p class="muted">{{ message }}</p>{% endif %}
 {% if not groups %}<div class="empty">Nenhum estabelecimento está marcado para visita presencial. No histórico, altere a etapa de um estabelecimento para “Visita presencial” para ele aparecer aqui.</div>{% endif %}
 {% for group in groups %}<details class="neighborhood" {% if groups|length == 1 %}open{% endif %}><summary>{{ group.name }} <span class="count">{{ group.leads|length }} local(is)</span></summary>
+<p><a class="btn" href="{{ group.share_url }}" target="_blank" rel="noopener">Compartilhar este bairro no WhatsApp</a></p>
 {% for lead in group.leads %}<article class="entry"><h3>{{ lead.name }}</h3><div class="muted">{{ lead.category or "Categoria não identificada" }}</div>
 <div class="meta"><div><b>Endereço</b>{{ lead.address or "Endereço não identificado publicamente" }}</div><div><b>Telefone</b>{{ lead.phone or "Não identificado publicamente" }}</div><div><b>WhatsApp</b>{{ lead.contact_whatsapp or lead.contact_phone or "Não identificado publicamente" }}</div></div>
 {% if lead.address %}<a href="https://www.google.com/maps/search/?api=1&query={{ lead.address|urlencode }}" target="_blank" rel="noopener">Abrir endereço no Google Maps ↗</a>{% elif lead.link %}<a href="{{ lead.link }}" target="_blank" rel="noopener">Ver estabelecimento no Google Maps ↗</a>{% endif %}
