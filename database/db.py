@@ -111,6 +111,9 @@ def init_db(path: str | None = None) -> None:
         for column in ("contact_emails", "contact_phones", "contact_whatsapps"):
             if column not in lead_columns:
                 conn.execute(f"ALTER TABLE leads ADD COLUMN {column} TEXT NOT NULL DEFAULT ''")
+        proposal_columns = {row["name"] for row in conn.execute("PRAGMA table_info(proposals)").fetchall()}
+        if "priority_version" not in proposal_columns:
+            conn.execute("ALTER TABLE proposals ADD COLUMN priority_version INTEGER NOT NULL DEFAULT 0")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_proposals_profile ON proposals(profile, created_at)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_leads_name ON leads(name)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status)")
@@ -333,11 +336,11 @@ def save_proposal(lead_id: int, profile: str, contact_type: str, contact_value: 
     init_db(path)
     with _connect(path) as conn:
         conn.execute("""INSERT INTO proposals
-            (lead_id, profile, contact_type, contact_value, source_url, score, justification, message)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (lead_id, profile, contact_type, contact_value, source_url, score, justification, message, priority_version)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
             ON CONFLICT(lead_id, profile, contact_type, contact_value) DO UPDATE SET
             source_url=excluded.source_url, score=excluded.score, justification=excluded.justification,
-            message=excluded.message, created_at=CURRENT_TIMESTAMP""",
+            message=excluded.message, priority_version=1, created_at=CURRENT_TIMESTAMP""",
             (lead_id, profile, contact_type, contact_value, source_url or "",
              max(0, min(100, int(analysis.get("score", 0)))),
              str(analysis.get("justificativa") or ""), str(analysis.get("mensagem") or "")))
