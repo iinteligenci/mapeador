@@ -1585,7 +1585,7 @@ def proposals_page(profile: str):
         contact_type = str(proposal.get("contact_type") or "").lower()
         if "@" in raw_value and not raw_value.startswith("@"):
             proposal["email_url"] = "mailto:" + quote(raw_value, safe="@.+-_")
-        digits = re.sub(r"\\D", "", raw_value)
+        digits = re.sub(r"\D", "", raw_value)
         if digits and ("whatsapp" in contact_type or "telefone" in contact_type or "phone" in contact_type):
             if len(digits) in (10, 11):
                 digits = "55" + digits
@@ -1594,7 +1594,7 @@ def proposals_page(profile: str):
             proposal["phone_url"] = "tel:+" + digits
         if not proposal["whatsapp_url"]:
             fallback = str(proposal.get("contact_whatsapp") or proposal.get("contact_phone") or "").strip()
-            fallback_digits = re.sub(r"\\D", "", fallback)
+            fallback_digits = re.sub(r"\D", "", fallback)
             if fallback_digits:
                 if len(fallback_digits) in (10, 11):
                     fallback_digits = "55" + fallback_digits
