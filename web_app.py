@@ -70,6 +70,17 @@ button{border:0;border-radius:10px;padding:12px 18px;background:var(--blue);colo
 .statusform{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}.statusform select{max-width:220px}.statusform button{margin:0;padding:10px 13px}.nav{display:flex;align-items:stretch;gap:10px;flex-wrap:wrap;margin:20px 0 24px}.nav-group{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:8px;background:rgba(18,32,57,.72);border:1px solid var(--line);border-radius:12px}.nav-group>span{width:100%;font-size:10px;letter-spacing:.09em;font-weight:800;color:var(--muted);padding:0 5px}.nav a{color:#b9dcff;text-decoration:none;border:1px solid #354761;background:#122039;padding:8px 11px;border-radius:9px;font-size:13px;white-space:nowrap}.nav a:hover{border-color:var(--blue);background:#193252}.nav a[aria-current="page"]{border-color:var(--blue);background:#1c4772;color:white}.empty{color:var(--muted);padding:18px 0}.footer{font-size:12px;color:var(--muted);text-align:center;margin-top:24px}
 @media(max-width:900px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:720px){main{padding:22px 14px}.formgrid,.stats,.details{grid-template-columns:1fr}h1{font-size:24px}.leadhead{flex-direction:column}.score{align-self:start}}
+
+/* Navegação unificada — Mapeador */
+.nav{display:flex;align-items:stretch;gap:10px;flex-wrap:wrap;margin:20px 0 24px}
+.nav-group{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:9px;background:rgba(18,32,57,.72);border:1px solid var(--line,#26354d);border-radius:13px;min-width:0}
+.nav-group>span{width:100%;font-size:10px;letter-spacing:.11em;font-weight:800;color:var(--muted,#a6b4ca);padding:0 5px}
+.nav a{display:inline-flex;align-items:center;gap:7px;color:#c6ddfa;text-decoration:none;border:1px solid #344761;background:#101d31;padding:9px 12px;border-radius:9px;font-size:13px;font-weight:600;line-height:1.3;white-space:nowrap;transition:background .15s ease,border-color .15s ease,transform .15s ease}
+.nav a:hover{border-color:#4da3ff;background:#193252;transform:translateY(-1px)}
+.nav a:focus-visible{outline:2px solid #4da3ff;outline-offset:2px}
+.nav a[aria-current="page"]{border-color:#4da3ff;background:#1b416b;color:#fff}
+@media(max-width:720px){.nav{display:grid;grid-template-columns:1fr;gap:8px}.nav-group{width:100%;gap:6px}.nav-group a{white-space:normal;flex:1 1 auto;text-align:center;justify-content:center}}
+
 </style>
 </head>
 <body><main>
@@ -584,6 +595,17 @@ HISTORY_PAGE = r"""
 :root{color-scheme:dark;--line:#26354d;--muted:#a6b4ca;--text:#edf4ff;--blue:#4da3ff}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top left,#162b49 0,#0b1220 48%);font:15px/1.5 Inter,Segoe UI,Arial,sans-serif;color:var(--text)}
 main{max-width:1180px;margin:auto;padding:34px 22px 64px}.brand{display:flex;gap:12px;align-items:center}.mark{width:46px;height:46px;border-radius:14px;background:linear-gradient(135deg,#58b7ff,#5b6cff);display:grid;place-items:center;font-size:24px;font-weight:800}h1{font-size:27px;margin:0}.sub,.muted{color:var(--muted)}.panel{background:#121d30;border:1px solid var(--line);border-radius:16px;padding:20px;margin:18px 0}.nav{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0}.nav a{color:#b9dcff;text-decoration:none;border:1px solid #354761;background:#122039;padding:9px 13px;border-radius:10px}.filters{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 20px}.filters a{padding:8px 12px;border:1px solid var(--line);border-radius:9px;text-decoration:none;color:var(--text)}.filters a.active{background:#1c4772;border-color:#4da3ff}.entry{background:#0d1829;border:1px solid var(--line);border-radius:13px;padding:16px;margin:12px 0}.top{display:flex;justify-content:space-between;gap:12px;align-items:start}.entry h3{margin:0}.pill{border-radius:99px;padding:4px 10px;background:#18344f;color:#b9dcff;font-size:12px}.meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0}.meta div{overflow-wrap:anywhere}.meta b{display:block;font-size:12px;color:var(--muted);font-weight:500}a{color:#83c5ff}select,button{border:1px solid #354761;background:#0c1627;color:var(--text);padding:10px;border-radius:9px;font:inherit}.statusform{display:flex;gap:8px;flex-wrap:wrap;align-items:center;border-top:1px solid var(--line);padding-top:12px}.statusform button{background:var(--blue);color:#071321;font-weight:700;cursor:pointer}.empty{color:var(--muted);padding:22px 0}.hint{font-size:12px;color:var(--muted)}@media(max-width:650px){main{padding:20px 13px}.meta{grid-template-columns:1fr}.top{flex-direction:column}}
+
+/* Navegação unificada — Mapeador */
+.nav{display:flex;align-items:stretch;gap:10px;flex-wrap:wrap;margin:20px 0 24px}
+.nav-group{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:9px;background:rgba(18,32,57,.72);border:1px solid var(--line,#26354d);border-radius:13px;min-width:0}
+.nav-group>span{width:100%;font-size:10px;letter-spacing:.11em;font-weight:800;color:var(--muted,#a6b4ca);padding:0 5px}
+.nav a{display:inline-flex;align-items:center;gap:7px;color:#c6ddfa;text-decoration:none;border:1px solid #344761;background:#101d31;padding:9px 12px;border-radius:9px;font-size:13px;font-weight:600;line-height:1.3;white-space:nowrap;transition:background .15s ease,border-color .15s ease,transform .15s ease}
+.nav a:hover{border-color:#4da3ff;background:#193252;transform:translateY(-1px)}
+.nav a:focus-visible{outline:2px solid #4da3ff;outline-offset:2px}
+.nav a[aria-current="page"]{border-color:#4da3ff;background:#1b416b;color:#fff}
+@media(max-width:720px){.nav{display:grid;grid-template-columns:1fr;gap:8px}.nav-group{width:100%;gap:6px}.nav-group a{white-space:normal;flex:1 1 auto;text-align:center;justify-content:center}}
+
 </style></head><body><main>
 <header><div class="brand"><div class="mark">M</div><div><h1>Estabelecimentos encontrados</h1><div class="muted">Seu histórico comercial fica salvo no banco local.</div></div></div>
 <nav class="nav" aria-label="Navegação principal">
@@ -640,6 +662,17 @@ ROUTES_PAGE = r"""
 :root{color-scheme:dark;--line:#26354d;--muted:#a6b4ca;--text:#edf4ff;--blue:#4da3ff}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top left,#162b49 0,#0b1220 48%);font:15px/1.5 Segoe UI,Arial,sans-serif;color:var(--text)}
 main{max-width:1100px;margin:auto;padding:30px 18px 60px}.panel,.neighborhood{background:#121d30;border:1px solid var(--line);border-radius:14px;padding:18px;margin:14px 0}.muted{color:var(--muted)}.nav{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0}.nav a{color:#b9dcff;text-decoration:none;border:1px solid #354761;background:#122039;padding:9px 13px;border-radius:10px}.neighborhood summary{cursor:pointer;font-weight:750;font-size:17px}.count{color:#83c5ff;font-size:13px;margin-left:8px}.entry{border:1px solid var(--line);border-radius:10px;padding:14px;margin-top:12px;background:#0d1829}.entry h3{margin:0 0 5px}.meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:10px 0}.meta b{display:block;color:var(--muted);font-size:12px;font-weight:500}.meta div{overflow-wrap:anywhere}a{color:#83c5ff}.empty{padding:20px 0;color:var(--muted)}@media(max-width:650px){main{padding:18px 12px}.meta{grid-template-columns:1fr}}
+
+/* Navegação unificada — Mapeador */
+.nav{display:flex;align-items:stretch;gap:10px;flex-wrap:wrap;margin:20px 0 24px}
+.nav-group{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:9px;background:rgba(18,32,57,.72);border:1px solid var(--line,#26354d);border-radius:13px;min-width:0}
+.nav-group>span{width:100%;font-size:10px;letter-spacing:.11em;font-weight:800;color:var(--muted,#a6b4ca);padding:0 5px}
+.nav a{display:inline-flex;align-items:center;gap:7px;color:#c6ddfa;text-decoration:none;border:1px solid #344761;background:#101d31;padding:9px 12px;border-radius:9px;font-size:13px;font-weight:600;line-height:1.3;white-space:nowrap;transition:background .15s ease,border-color .15s ease,transform .15s ease}
+.nav a:hover{border-color:#4da3ff;background:#193252;transform:translateY(-1px)}
+.nav a:focus-visible{outline:2px solid #4da3ff;outline-offset:2px}
+.nav a[aria-current="page"]{border-color:#4da3ff;background:#1b416b;color:#fff}
+@media(max-width:720px){.nav{display:grid;grid-template-columns:1fr;gap:8px}.nav-group{width:100%;gap:6px}.nav-group a{white-space:normal;flex:1 1 auto;text-align:center;justify-content:center}}
+
 </style></head><body><main>
 <h1>🗺️ Rotas de visitas presenciais</h1><p class="muted">Estabelecimentos marcados como “Visita presencial”, organizados por bairro. Clique em um bairro para abrir a lista de locais.</p>
 <nav class="nav" aria-label="Navegação principal">
@@ -670,6 +703,17 @@ CAMPAIGNS_PAGE = r"""
 <!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Mapeador | Campanhas</title><style>
 body{margin:0;background:#0b1220;color:#edf4ff;font:15px/1.5 Segoe UI,Arial}main{max-width:1000px;margin:auto;padding:28px 16px}.panel,.entry{background:#121d30;border:1px solid #26354d;border-radius:14px;padding:18px;margin:14px 0}input,textarea,select{box-sizing:border-box;width:100%;background:#0c1627;color:#edf4ff;border:1px solid #354761;border-radius:9px;padding:11px;font:inherit;margin:5px 0 12px}button,.btn{display:inline-block;background:#4da3ff;color:#071321;border:0;border-radius:9px;padding:10px 14px;font-weight:700;text-decoration:none;cursor:pointer}a{color:#83c5ff}.nav{display:flex;gap:12px;margin:16px 0}.muted{color:#a6b4ca;font-size:13px}
+
+/* Navegação unificada — Mapeador */
+.nav{display:flex;align-items:stretch;gap:10px;flex-wrap:wrap;margin:20px 0 24px}
+.nav-group{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:9px;background:rgba(18,32,57,.72);border:1px solid var(--line,#26354d);border-radius:13px;min-width:0}
+.nav-group>span{width:100%;font-size:10px;letter-spacing:.11em;font-weight:800;color:var(--muted,#a6b4ca);padding:0 5px}
+.nav a{display:inline-flex;align-items:center;gap:7px;color:#c6ddfa;text-decoration:none;border:1px solid #344761;background:#101d31;padding:9px 12px;border-radius:9px;font-size:13px;font-weight:600;line-height:1.3;white-space:nowrap;transition:background .15s ease,border-color .15s ease,transform .15s ease}
+.nav a:hover{border-color:#4da3ff;background:#193252;transform:translateY(-1px)}
+.nav a:focus-visible{outline:2px solid #4da3ff;outline-offset:2px}
+.nav a[aria-current="page"]{border-color:#4da3ff;background:#1b416b;color:#fff}
+@media(max-width:720px){.nav{display:grid;grid-template-columns:1fr;gap:8px}.nav-group{width:100%;gap:6px}.nav-group a{white-space:normal;flex:1 1 auto;text-align:center;justify-content:center}}
+
 </style></head><body><main><h1>Central de campanhas</h1><p class="muted">Você cria e revisa a mensagem. A abertura do WhatsApp é manual; nada é enviado automaticamente.</p><nav class="nav" aria-label="Navegação principal">
  <div class="nav-group"><span>PROSPECÇÃO</span><a href="/">＋ Nova prospecção</a><a href="/history">▤ Estabelecimentos</a><a href="/removed">🚫 Removidos</a></div>
  <div class="nav-group"><span>CAMPO</span><a href="/visits">📍 Visitas presenciais</a><a href="/routes">🗺️ Rotas</a></div>
@@ -688,6 +732,17 @@ body{margin:0;background:#0b1220;color:#edf4ff;font:15px/1.5 Segoe UI,Arial}main
 CAMPAIGN_DETAIL_PAGE = r"""
 <!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Campanha</title><style>
 body{margin:0;background:#0b1220;color:#edf4ff;font:15px/1.5 Segoe UI,Arial}main{max-width:1000px;margin:auto;padding:28px 16px}.panel,.entry{background:#121d30;border:1px solid #26354d;border-radius:14px;padding:18px;margin:14px 0}a{color:#83c5ff}.btn,button{display:inline-block;background:#4da3ff;color:#071321;border:0;border-radius:9px;padding:10px 14px;font-weight:700;text-decoration:none;cursor:pointer}input,select{background:#0c1627;color:#edf4ff;border:1px solid #354761;border-radius:9px;padding:9px}label,.muted{color:#a6b4ca;font-size:13px}.draft{white-space:pre-wrap;background:#0c1627;padding:12px;border-radius:9px}.entry form{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+
+/* Navegação unificada — Mapeador */
+.nav{display:flex;align-items:stretch;gap:10px;flex-wrap:wrap;margin:20px 0 24px}
+.nav-group{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:9px;background:rgba(18,32,57,.72);border:1px solid var(--line,#26354d);border-radius:13px;min-width:0}
+.nav-group>span{width:100%;font-size:10px;letter-spacing:.11em;font-weight:800;color:var(--muted,#a6b4ca);padding:0 5px}
+.nav a{display:inline-flex;align-items:center;gap:7px;color:#c6ddfa;text-decoration:none;border:1px solid #344761;background:#101d31;padding:9px 12px;border-radius:9px;font-size:13px;font-weight:600;line-height:1.3;white-space:nowrap;transition:background .15s ease,border-color .15s ease,transform .15s ease}
+.nav a:hover{border-color:#4da3ff;background:#193252;transform:translateY(-1px)}
+.nav a:focus-visible{outline:2px solid #4da3ff;outline-offset:2px}
+.nav a[aria-current="page"]{border-color:#4da3ff;background:#1b416b;color:#fff}
+@media(max-width:720px){.nav{display:grid;grid-template-columns:1fr;gap:8px}.nav-group{width:100%;gap:6px}.nav-group a{white-space:normal;flex:1 1 auto;text-align:center;justify-content:center}}
+
 </style></head><body><main><p><a href="/campaigns">← Campanhas</a></p><h1>{{campaign.name}}</h1><p class="muted">{{'4K Food Service' if campaign.profile == '4k' else 'Presença Digital'}} · {{leads|length}} contatos</p><section class="panel"><h2>Mensagem aprovada por você</h2><div class="draft">{{campaign.message}}</div><p class="muted">Para abrir a conversa, marque a confirmação de autorização aplicável e clique em Abrir WhatsApp. Você ainda precisa conferir e enviar dentro do WhatsApp.</p></section>
 {% for lead in leads %}<article class="entry"><h3>{{lead.name}}</h3><p>{{lead.category}} · {{lead.chosen_phone or 'Sem telefone público'}}</p><p class="muted">WhatsApp: {{lead.contact_whatsapp or 'não confirmado'}} · CNPJ: {{lead.cnpj or 'não identificado publicamente'}}</p>
 {% if lead.wa_url %}<a class="btn" href="{{lead.wa_url}}" target="_blank" rel="noopener">Abrir mensagem no WhatsApp</a>{% else %}<p class="muted">Número ausente ou inválido para link do WhatsApp.</p>{% endif %}
@@ -699,7 +754,18 @@ body{margin:0;background:#0b1220;color:#edf4ff;font:15px/1.5 Segoe UI,Arial}main
 
 AUTO_PAGE = r"""
 <!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Mapeador | Modo automático</title>
-<style>body{margin:0;background:#0b1220;color:#edf4ff;font:15px/1.5 Segoe UI,Arial}main{max-width:900px;margin:auto;padding:28px 16px}.panel{background:#121d30;border:1px solid #26354d;border-radius:14px;padding:20px;margin:16px 0}input,select{box-sizing:border-box;width:100%;background:#0c1627;color:#edf4ff;border:1px solid #354761;border-radius:9px;padding:12px;font:inherit;margin:6px 0 14px}button,.btn{display:inline-block;background:#4da3ff;color:#071321;border:0;border-radius:9px;padding:11px 15px;font-weight:700;text-decoration:none;cursor:pointer}a{color:#83c5ff}.muted{color:#a6b4ca}.nav{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}.nav a{border:1px solid #354761;padding:8px 11px;border-radius:8px;text-decoration:none}</style></head><body><main>
+<style>body{margin:0;background:#0b1220;color:#edf4ff;font:15px/1.5 Segoe UI,Arial}main{max-width:900px;margin:auto;padding:28px 16px}.panel{background:#121d30;border:1px solid #26354d;border-radius:14px;padding:20px;margin:16px 0}input,select{box-sizing:border-box;width:100%;background:#0c1627;color:#edf4ff;border:1px solid #354761;border-radius:9px;padding:12px;font:inherit;margin:6px 0 14px}button,.btn{display:inline-block;background:#4da3ff;color:#071321;border:0;border-radius:9px;padding:11px 15px;font-weight:700;text-decoration:none;cursor:pointer}a{color:#83c5ff}.muted{color:#a6b4ca}.nav{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}.nav a{border:1px solid #354761;padding:8px 11px;border-radius:8px;text-decoration:none}
+/* Navegação unificada — Mapeador */
+.nav{display:flex;align-items:stretch;gap:10px;flex-wrap:wrap;margin:20px 0 24px}
+.nav-group{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:9px;background:rgba(18,32,57,.72);border:1px solid var(--line,#26354d);border-radius:13px;min-width:0}
+.nav-group>span{width:100%;font-size:10px;letter-spacing:.11em;font-weight:800;color:var(--muted,#a6b4ca);padding:0 5px}
+.nav a{display:inline-flex;align-items:center;gap:7px;color:#c6ddfa;text-decoration:none;border:1px solid #344761;background:#101d31;padding:9px 12px;border-radius:9px;font-size:13px;font-weight:600;line-height:1.3;white-space:nowrap;transition:background .15s ease,border-color .15s ease,transform .15s ease}
+.nav a:hover{border-color:#4da3ff;background:#193252;transform:translateY(-1px)}
+.nav a:focus-visible{outline:2px solid #4da3ff;outline-offset:2px}
+.nav a[aria-current="page"]{border-color:#4da3ff;background:#1b416b;color:#fff}
+@media(max-width:720px){.nav{display:grid;grid-template-columns:1fr;gap:8px}.nav-group{width:100%;gap:6px}.nav-group a{white-space:normal;flex:1 1 auto;text-align:center;justify-content:center}}
+
+</style></head><body><main>
 <h1>Modo automático</h1><p class="muted">O Mapeador pode pesquisar negócios, complementar dados públicos e criar rascunhos separados para cada canal de contato e para cada empresa. O computador e o Mapeador precisam permanecer ligados.</p>
 <nav class="nav" aria-label="Navegação principal">
  <div class="nav-group"><span>PROSPECÇÃO</span><a href="/">＋ Nova prospecção</a><a href="/history">▤ Estabelecimentos</a><a href="/removed">🚫 Removidos</a></div>
@@ -723,7 +789,18 @@ AUTO_PAGE = r"""
 
 PROPOSALS_PAGE = r"""
 <!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Propostas automáticas</title>
-<style>body{margin:0;background:#0b1220;color:#edf4ff;font:15px/1.5 Segoe UI,Arial}main{max-width:1050px;margin:auto;padding:28px 16px}.panel,.entry{background:#121d30;border:1px solid #26354d;border-radius:14px;padding:18px;margin:14px 0}a{color:#83c5ff}.nav{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}.nav a{border:1px solid #354761;padding:8px 11px;border-radius:8px;text-decoration:none}.muted{color:#a6b4ca;font-size:13px}.draft{white-space:pre-wrap;background:#0c1627;padding:14px;border-radius:9px}.tabs{display:flex;gap:10px;flex-wrap:wrap}.tabs a{padding:10px 14px;border:1px solid #354761;border-radius:9px;text-decoration:none}.active{background:#1c4772}</style></head><body><main>
+<style>body{margin:0;background:#0b1220;color:#edf4ff;font:15px/1.5 Segoe UI,Arial}main{max-width:1050px;margin:auto;padding:28px 16px}.panel,.entry{background:#121d30;border:1px solid #26354d;border-radius:14px;padding:18px;margin:14px 0}a{color:#83c5ff}.nav{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}.nav a{border:1px solid #354761;padding:8px 11px;border-radius:8px;text-decoration:none}.muted{color:#a6b4ca;font-size:13px}.draft{white-space:pre-wrap;background:#0c1627;padding:14px;border-radius:9px}.tabs{display:flex;gap:10px;flex-wrap:wrap}.tabs a{padding:10px 14px;border:1px solid #354761;border-radius:9px;text-decoration:none}.active{background:#1c4772}
+/* Navegação unificada — Mapeador */
+.nav{display:flex;align-items:stretch;gap:10px;flex-wrap:wrap;margin:20px 0 24px}
+.nav-group{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:9px;background:rgba(18,32,57,.72);border:1px solid var(--line,#26354d);border-radius:13px;min-width:0}
+.nav-group>span{width:100%;font-size:10px;letter-spacing:.11em;font-weight:800;color:var(--muted,#a6b4ca);padding:0 5px}
+.nav a{display:inline-flex;align-items:center;gap:7px;color:#c6ddfa;text-decoration:none;border:1px solid #344761;background:#101d31;padding:9px 12px;border-radius:9px;font-size:13px;font-weight:600;line-height:1.3;white-space:nowrap;transition:background .15s ease,border-color .15s ease,transform .15s ease}
+.nav a:hover{border-color:#4da3ff;background:#193252;transform:translateY(-1px)}
+.nav a:focus-visible{outline:2px solid #4da3ff;outline-offset:2px}
+.nav a[aria-current="page"]{border-color:#4da3ff;background:#1b416b;color:#fff}
+@media(max-width:720px){.nav{display:grid;grid-template-columns:1fr;gap:8px}.nav-group{width:100%;gap:6px}.nav-group a{white-space:normal;flex:1 1 auto;text-align:center;justify-content:center}}
+
+</style></head><body><main>
 <h1>Propostas geradas automaticamente</h1><nav class="nav" aria-label="Navegação principal">
  <div class="nav-group"><span>PROSPECÇÃO</span><a href="/">＋ Nova prospecção</a><a href="/history">▤ Estabelecimentos</a><a href="/removed">🚫 Removidos</a></div>
  <div class="nav-group"><span>CAMPO</span><a href="/visits">📍 Visitas presenciais</a><a href="/routes">🗺️ Rotas</a></div>
