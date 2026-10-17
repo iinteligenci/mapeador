@@ -347,14 +347,16 @@ def get_proposals(profile: str | None = None, path: str | None = None) -> list[d
     init_db(path)
     with _connect(path) as conn:
         if profile in {"4k", "digital"}:
-            rows = conn.execute("""SELECT p.*, l.name AS lead_name, l.category, l.phone, l.website
+            rows = conn.execute("""SELECT p.*, l.name AS lead_name, l.category, l.phone, l.website, l.address, l.link AS maps_url,
+                       l.contact_emails, l.contact_phones, l.contact_whatsapps, l.contact_whatsapp, l.contact_phone
                 FROM proposals p JOIN leads l ON l.id=p.lead_id
                 WHERE p.profile=? AND l.status NOT IN ('removed','in_person')
-                ORDER BY p.created_at DESC, p.id DESC""", (profile,))
+                ORDER BY p.score DESC, p.created_at DESC, p.id DESC""", (profile,))
         else:
-            rows = conn.execute("""SELECT p.*, l.name AS lead_name, l.category, l.phone, l.website
+            rows = conn.execute("""SELECT p.*, l.name AS lead_name, l.category, l.phone, l.website, l.address, l.link AS maps_url,
+                       l.contact_emails, l.contact_phones, l.contact_whatsapps, l.contact_whatsapp, l.contact_phone
                 FROM proposals p JOIN leads l ON l.id=p.lead_id
                 WHERE l.status NOT IN ('removed','in_person')
-                ORDER BY p.created_at DESC, p.id DESC""")
+                ORDER BY p.score DESC, p.created_at DESC, p.id DESC""")
         return [dict(row) for row in rows]
 
