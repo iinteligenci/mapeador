@@ -284,7 +284,7 @@ document.getElementById('searchForm').addEventListener('submit', function(){
 <script>
 /* Navegação contextual: sempre destaca a área atual do fluxo */
 (function(){
-  const path = window.location.pathname.replace(/\\/$/, '') || '/';
+  const rawPath = window.location.pathname;\n  const path = (rawPath.length > 1 && rawPath.endsWith('/') ? rawPath.slice(0, -1) : rawPath) || '/';
   document.querySelectorAll('.nav a[href]').forEach(function(link){
     const href = link.getAttribute('href');
     let active = href === path;
