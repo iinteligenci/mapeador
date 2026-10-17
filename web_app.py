@@ -1634,6 +1634,35 @@ def _background_research_loop() -> None:
                     print("Mapeador — endereço da rota:", type(address_exc).__name__, address_exc)
             settings = get_automation_settings(db_path)
             if settings.get("enabled"):
+                # Re-score legacy drafts once with the new reply-potential rubric, in small batches.
+                try:
+                    existing_proposals = get_proposals(path=db_path)
+                    stale = next((p for p in existing_proposals if int(p.get("priority_version") or 0) < 1), None)
+                    if stale and stale.get("profile") in {"4k", "digital"}:
+                        lead_for_scoring = {
+                            "name": stale.get("lead_name", ""),
+                            "category": stale.get("category", ""),
+                            "phone": stale.get("phone", ""),
+                            "address": stale.get("address", ""),
+                            "website": stale.get("website", ""),
+                            "contact_whatsapp": stale.get("contact_whatsapp", ""),
+                            "contact_emails": stale.get("contact_emails", ""),
+                        }
+                        scored = analyze_lead_profiles(lead_for_scoring, [stale["profile"]]).get(stale["profile"])
+                        if scored:
+                            for old_proposal in existing_proposals:
+                                if (int(old_proposal.get("priority_version") or 0) < 1
+                                        and old_proposal.get("lead_id") == stale.get("lead_id")
+                                        and old_proposal.get("profile") == stale.get("profile")):
+                                    save_proposal(
+                                        int(old_proposal["lead_id"]), old_proposal["profile"],
+                                        old_proposal.get("contact_type", "empresa"),
+                                        old_proposal.get("contact_value", ""),
+                                        old_proposal.get("source_url", ""), scored, db_path
+                                    )
+                            activity = True
+                except Exception as scoring_exc:
+                    print(f"Mapeador — reclassificação de propostas: {type(scoring_exc).__name__}: {scoring_exc}")
                 records = get_leads(path=db_path)
                 known_links = {str(item.get("link") or "").split("?")[0].rstrip("/") for item in records}
                 try:
