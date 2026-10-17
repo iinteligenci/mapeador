@@ -562,6 +562,9 @@ def history():
     selected = (request.args.get("status") or "all").strip()
     if selected not in {"all", "to_visit", "visited", "client"}:
         selected = "all"
+    selected_group = (request.args.get("group") or "others").strip()
+    if selected_group not in {"others", "distributors"}:
+        selected_group = "others"
     leads = [lead for lead in get_leads(path=db_path) if lead.get("status") not in {"in_person", "removed"}]
     distributor_terms = ("distribuidora", "distribuidor", "distribuicao", "distribuição", "atacadista", "atacado", "food service", "foodservice")
     for lead in leads:
@@ -575,7 +578,8 @@ def history():
     leads.sort(key=lambda lead: str(lead.get("name") or "").casefold())
     distributor_leads = [lead for lead in leads if lead["business_group"] == "Distribuidoras"]
     other_leads = [lead for lead in leads if lead["business_group"] == "Outros estabelecimentos"]
-    return render_template_string(HISTORY_PAGE, leads=other_leads, distributor_leads=distributor_leads, selected=selected, labels=STATUS_LABELS)
+    visible_leads = distributor_leads if selected_group == "distributors" else other_leads
+    return render_template_string(HISTORY_PAGE, leads=visible_leads, distributor_leads=distributor_leads, other_leads=other_leads, selected=selected, selected_group=selected_group, labels=STATUS_LABELS)
 
 
 @app.get("/visits")
@@ -812,13 +816,17 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
 </nav></header>
 <section class="panel"><h2>{{ leads|length }} estabelecimento(s) nesta lista</h2>
 <div class="filters">
-<a href="/history" class="{{ 'active' if selected == 'all' else '' }}">Todos</a>
-<a href="/history?status=to_visit" class="{{ 'active' if selected == 'to_visit' else '' }}">Para visitar</a>
-<a href="/history?status=visited" class="{{ 'active' if selected == 'visited' else '' }}">Visitados</a>
-<a href="/history?status=client" class="{{ 'active' if selected == 'client' else '' }}">Clientes</a>
+<a href="/history?group=others" class="{{ 'active' if selected_group == 'others' else '' }}">Outros estabelecimentos ({{ other_leads|length }})</a>
+<a href="/history?group=distributors" class="{{ 'active' if selected_group == 'distributors' else '' }}">Distribuidoras ({{ distributor_leads|length }})</a>
+</div>
+<div class="filters">
+<a href="/history?group={{ selected_group }}" class="{{ 'active' if selected == 'all' else '' }}">Todos</a>
+<a href="/history?group={{ selected_group }}&status=to_visit" class="{{ 'active' if selected == 'to_visit' else '' }}">Para visitar</a>
+<a href="/history?group={{ selected_group }}&status=visited" class="{{ 'active' if selected == 'visited' else '' }}">Visitados</a>
+<a href="/history?group={{ selected_group }}&status=client" class="{{ 'active' if selected == 'client' else '' }}">Clientes</a>
 </div>
 {% if not leads %}<div class="empty">Nenhum estabelecimento nesta categoria ainda. Faça uma busca para adicionar negócios ao histórico.</div>{% endif %}
-{% if distributor_leads %}<section class="panel business-category" style="margin-top:18px;border-color:#315a83!important">
+{% if selected_group == "distributors" and distributor_leads %}<section class="panel business-category" style="margin-top:18px;border-color:#315a83!important">
 <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><h2 style="margin:0">Distribuidoras</h2><span class="pill">Distribuição e atacado · {{ distributor_leads|length }}</span></div>
 {% for lead in distributor_leads %}
 <article class="entry">
@@ -846,14 +854,14 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
 <select id="history-proposal-{{lead.id}}" name="proposal_profile"><option value="4k">4K Food Service</option><option value="digital">Presença digital</option><option value="both">Ambas as empresas</option></select>
 <input name="proposal_offer" placeholder="Oferta personalizada (opcional)" style="max-width:260px">
 <button type="submit">Gerar proposta</button></form>
-<form class="statusform" method="post" action="/status"><input type="hidden" name="lead_id" value="{{lead.id}}"><input type="hidden" name="return_to" value="history"><input type="hidden" name="selected" value="{{selected}}">
+<form class="statusform" method="post" action="/status"><input type="hidden" name="lead_id" value="{{lead.id}}"><input type="hidden" name="return_to" value="history"><input type="hidden" name="selected" value="{{selected}}"><input type="hidden" name="group" value="{{selected_group}}">
 <label for="history-status-{{lead.id}}" class="muted">Alterar etapa:</label>
 <select id="history-status-{{lead.id}}" name="status">{% for value,label in labels.items() %}<option value="{{value}}" {% if lead.status == value %}selected{% endif %}>{{label}}</option>{% endfor %}</select>
 <button type="submit">Salvar</button></form>
 </article>
 {% endfor %}
 </section>{% endif %}
-{% if other_leads %}<section class="panel business-category" style="margin-top:18px">
+{% if selected_group == "others" and other_leads %}<section class="panel business-category" style="margin-top:18px">
 <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><h2 style="margin:0">Outros estabelecimentos</h2><span class="pill">Restaurantes, bares, açougues e outros · {{ other_leads|length }}</span></div>
 {% for lead in other_leads %}
 <article class="entry">
