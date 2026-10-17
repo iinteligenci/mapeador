@@ -354,7 +354,7 @@ def get_proposals(profile: str | None = None, path: str | None = None) -> list[d
                        l.contact_emails, l.contact_phones, l.contact_whatsapps, l.contact_whatsapp, l.contact_phone
                 FROM proposals p JOIN leads l ON l.id=p.lead_id
                 WHERE p.profile=? AND l.status NOT IN ('removed','in_person')
-                ORDER BY p.score DESC, p.created_at DESC, p.id DESC""", (profile,))
+                ORDER BY (SELECT MAX(p2.score) FROM proposals p2 WHERE p2.lead_id=p.lead_id AND p2.profile=p.profile) DESC, p.lead_id, p.score DESC, p.created_at DESC, p.id DESC""", (profile,))
         else:
             rows = conn.execute("""SELECT p.*, l.name AS lead_name, l.category, l.phone, l.website, l.address, l.link AS maps_url,
                        l.contact_emails, l.contact_phones, l.contact_whatsapps, l.contact_whatsapp, l.contact_phone
