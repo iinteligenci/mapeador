@@ -1501,14 +1501,14 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
 @media(max-width:390px){.nav-group{grid-template-columns:1fr!important}.nav-group>span{grid-column:1!important}.stats{grid-template-columns:1fr!important}}
 
 </style></head><body><main>
-<h1>Propostas geradas automaticamente</h1><nav class="nav" aria-label="Navegação principal">
+<h1>Propostas priorizadas por IA</h1><nav class="nav" aria-label="Navegação principal">
  <div class="nav-group"><span>PROSPECÇÃO</span><a href="/">＋ Nova prospecção</a><a href="/history">▤ Estabelecimentos</a><a href="/removed">🚫 Removidos</a></div>
  <div class="nav-group"><span>CAMPO</span><a href="/visits">📍 Visitas presenciais</a><a href="/routes">🗺️ Rotas</a></div>
  <div class="nav-group"><span>COMERCIAL</span><a href="/campaigns">✉ Campanhas</a><a href="/proposals/4k">Propostas 4K</a><a href="/proposals/digital">Propostas presença digital</a></div>
  <div class="nav-group"><span>AUTOMAÇÃO</span><a href="/automatic">⚙ Modo automático</a></div>
 </nav>
 <div class="tabs"><a class="{{'active' if profile == '4k' else ''}}" href="/proposals/4k">4K Food Service ({{count4k}})</a><a class="{{'active' if profile == 'digital' else ''}}" href="/proposals/digital">Presença digital ({{countdigital}})</a></div>
-<p class="muted">Cada cartão é um rascunho separado por empresa e canal público encontrado. Nenhuma mensagem foi enviada.</p>
+<p class="muted">A IA ordena primeiro os estabelecimentos com melhores sinais públicos de aderência e possibilidade de resposta. O modo automático continua pesquisando, enriquecendo contatos e preparando rascunhos. Os links abrem WhatsApp com a mensagem ou o e-mail com assunto e texto preenchidos; revise antes de enviar. Nenhuma mensagem é disparada automaticamente.</p>
 {% for p in proposals %}<article class="entry"><h2>{{p.lead_name}}</h2><p class="muted">{{p.category}} · {{'4K Food Service' if p.profile == '4k' else 'Presença digital'}} · Prioridade de abordagem: <strong>{{p.score}}/100</strong></p>
 <p><strong>Canal encontrado:</strong> {{p.contact_type}} · {{p.contact_value or 'Contato comercial público'}}</p><p>{{p.justification}}</p><div class="draft">{{p.message}}</div>
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
