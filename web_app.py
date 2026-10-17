@@ -572,8 +572,10 @@ def history():
         lead["business_group"] = "Distribuidoras" if any(term in searchable for term in distributor_terms) else "Outros estabelecimentos"
     if selected != "all":
         leads = [lead for lead in leads if lead["status"] == selected]
-    leads.sort(key=lambda lead: (0 if lead["business_group"] == "Distribuidoras" else 1, str(lead.get("name") or "").casefold()))
-    return render_template_string(HISTORY_PAGE, leads=leads, selected=selected, labels=STATUS_LABELS)
+    leads.sort(key=lambda lead: str(lead.get("name") or "").casefold())
+    distributor_leads = [lead for lead in leads if lead["business_group"] == "Distribuidoras"]
+    other_leads = [lead for lead in leads if lead["business_group"] == "Outros estabelecimentos"]
+    return render_template_string(HISTORY_PAGE, leads=other_leads, distributor_leads=distributor_leads, selected=selected, labels=STATUS_LABELS)
 
 
 @app.get("/visits")
@@ -816,14 +818,9 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
 <a href="/history?status=client" class="{{ 'active' if selected == 'client' else '' }}">Clientes</a>
 </div>
 {% if not leads %}<div class="empty">Nenhum estabelecimento nesta categoria ainda. Faça uma busca para adicionar negócios ao histórico.</div>{% endif %}
-{% set ns = namespace(group=None) %}
-{% for lead in leads %}
-{% if lead.business_group != ns.group %}
-{% if ns.group is not none %}</section>{% endif %}
-{% set ns.group = lead.business_group %}
-<section class="panel business-category" style="margin-top:18px">
-<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><h2 style="margin:0">{{ lead.business_group }}</h2><span class="pill">{% if lead.business_group == 'Distribuidoras' %}Distribuição e atacado{% else %}Demais categorias{% endif %}</span></div>
-{% endif %}
+{% if distributor_leads %}<section class="panel business-category" style="margin-top:18px;border-color:#315a83!important">
+<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><h2 style="margin:0">Distribuidoras</h2><span class="pill">Distribuição e atacado · {{ distributor_leads|length }}</span></div>
+{% for lead in distributor_leads %}
 <article class="entry">
 <div class="top"><div><h3>{{ lead.name }}</h3><div class="muted">{{ lead.category or "Categoria não identificada" }}</div></div><span class="pill">{{ lead.status_label }}</span></div>
 <div class="meta">
@@ -854,9 +851,44 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
 <select id="history-status-{{lead.id}}" name="status">{% for value,label in labels.items() %}<option value="{{value}}" {% if lead.status == value %}selected{% endif %}>{{label}}</option>{% endfor %}</select>
 <button type="submit">Salvar</button></form>
 </article>
-{% if loop.last %}</section>{% endif %}
 {% endfor %}
-<p class="hint">O Mapeador classifica automaticamente como “Distribuidoras” os estabelecimentos cujo nome ou categoria pública contém termos de distribuição, atacado ou food service. Confira a classificação quando o cadastro tiver poucas informações.</p>
+</section>{% endif %}
+{% if other_leads %}<section class="panel business-category" style="margin-top:18px">
+<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><h2 style="margin:0">Outros estabelecimentos</h2><span class="pill">Restaurantes, bares, açougues e outros · {{ other_leads|length }}</span></div>
+{% for lead in other_leads %}
+<article class="entry">
+<div class="top"><div><h3>{{ lead.name }}</h3><div class="muted">{{ lead.category or "Categoria não identificada" }}</div></div><span class="pill">{{ lead.status_label }}</span></div>
+<div class="meta">
+<div><b>Telefone comercial</b>{{ lead.phone or "Não identificado publicamente" }}</div>
+<div><b>Responsável público</b>{{ lead.contact_name or "Não identificado publicamente" }}{% if lead.contact_role %} · {{ lead.contact_role }}{% endif %}</div>
+<div><b>Telefone do contato publicado</b>{{ lead.contact_phone or "Não identificado publicamente" }}</div>
+<div><b>WhatsApp comercial</b>{{ lead.contact_whatsapp or "Não identificado publicamente" }}</div>
+<div><b>Fonte do contato</b>{% if lead.contact_source %}<a href="{{lead.contact_source}}" target="_blank" rel="noopener">Ver página de origem</a>{% else %}Não identificado publicamente{% endif %}</div>
+<div><b>Confiança da identificação</b>{{ lead.contact_confidence or "Não identificado" }}</div>
+<div><b>Site</b>{% if lead.website %}<a href="{{lead.website}}" target="_blank" rel="noopener">{{lead.website}}</a>{% else %}Não identificado publicamente{% endif %}</div>
+<div><b>Prioridade preliminar</b>{{ (lead.score|string + "/100") if lead.score is not none else "Ainda não avaliada" }}</div>
+<div><b>Última atualização</b>{{ lead.updated_at }}</div>
+<div><b>Análise</b>{{ lead.justification or "Análise não registrada" }}</div>
+</div>
+{% if lead.message %}<details><summary>Ver última proposta gerada (não enviada)</summary><p style="white-space:pre-wrap">{{ lead.message }}</p></details>{% endif %}
+{% if lead.link %}<p><a href="{{lead.link}}" target="_blank" rel="noopener">Abrir no Google Maps ↗</a></p>{% endif %}
+<form class="statusform" method="post" action="/contacts">
+<input type="hidden" name="lead_id" value="{{lead.id}}"><input type="hidden" name="source" value="history">
+<button type="submit">Encontrar responsável e contatos públicos</button></form>
+<form class="statusform" method="post" action="/proposal">
+<input type="hidden" name="lead_id" value="{{lead.id}}"><input type="hidden" name="term" value="Estabelecimento do histórico"><input type="hidden" name="limit" value="3">
+<label for="history-proposal-{{lead.id}}" class="muted">Gerar proposta para:</label>
+<select id="history-proposal-{{lead.id}}" name="proposal_profile"><option value="4k">4K Food Service</option><option value="digital">Presença digital</option><option value="both">Ambas as empresas</option></select>
+<input name="proposal_offer" placeholder="Oferta personalizada (opcional)" style="max-width:260px">
+<button type="submit">Gerar proposta</button></form>
+<form class="statusform" method="post" action="/status"><input type="hidden" name="lead_id" value="{{lead.id}}"><input type="hidden" name="return_to" value="history"><input type="hidden" name="selected" value="{{selected}}">
+<label for="history-status-{{lead.id}}" class="muted">Alterar etapa:</label>
+<select id="history-status-{{lead.id}}" name="status">{% for value,label in labels.items() %}<option value="{{value}}" {% if lead.status == value %}selected{% endif %}>{{label}}</option>{% endfor %}</select>
+<button type="submit">Salvar</button></form>
+</article>
+{% endfor %}
+</section>{% endif %}
+<p class="hint">Distribuidoras e outros estabelecimentos são exibidos em listas separadas. A classificação automática usa o nome e a categoria pública encontrados; confira cadastros com poucas informações.</p>
 <p class="hint">A busca ignora estabelecimentos já encontrados. Para criar uma mensagem, escolha a empresa e clique em “Gerar proposta”. O histórico fica neste computador, no banco SQLite local.</p>
 </section></main>
 <script>
