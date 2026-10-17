@@ -111,16 +111,6 @@ def init_db(path: str | None = None) -> None:
         for column in ("contact_emails", "contact_phones", "contact_whatsapps"):
             if column not in lead_columns:
                 conn.execute(f"ALTER TABLE leads ADD COLUMN {column} TEXT NOT NULL DEFAULT ''")
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS sales_examples (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT NOT NULL DEFAULT '',
-                conversation TEXT NOT NULL,
-                preferred_reply TEXT NOT NULL,
-                notes TEXT NOT NULL DEFAULT '',
-                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_proposals_profile ON proposals(profile, created_at)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_leads_name ON leads(name)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status)")
@@ -368,30 +358,3 @@ def get_proposals(profile: str | None = None, path: str | None = None) -> list[d
                 ORDER BY p.created_at DESC, p.id DESC""")
         return [dict(row) for row in rows]
 
-
-
-def save_sales_example(conversation: str, preferred_reply: str, title: str = "",
-                      notes: str = "", path: str | None = None) -> int:
-    """Salva exemplos aprovados pelo usuário para orientar futuras respostas comerciais."""
-    conversation = str(conversation or "").strip()[:12000]
-    preferred_reply = str(preferred_reply or "").strip()[:4000]
-    if not conversation or not preferred_reply:
-        raise ValueError("Informe a conversa real e a resposta que você considera boa.")
-    init_db(path)
-    with _connect(path) as conn:
-        cursor = conn.execute(
-            "INSERT INTO sales_examples(title, conversation, preferred_reply, notes) VALUES (?, ?, ?, ?)",
-            (str(title or "").strip()[:160], conversation, preferred_reply, str(notes or "").strip()[:1000]),
-        )
-        return int(cursor.lastrowid)
-
-
-def get_sales_examples(path: str | None = None, limit: int = 12) -> list[dict[str, Any]]:
-    """Retorna exemplos recentes para contextualizar o assistente comercial."""
-    init_db(path)
-    with _connect(path) as conn:
-        rows = conn.execute(
-            "SELECT * FROM sales_examples ORDER BY created_at DESC, id DESC LIMIT ?",
-            (max(1, min(int(limit), 30)),),
-        ).fetchall()
-        return [dict(row) for row in rows]
