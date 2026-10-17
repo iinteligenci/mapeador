@@ -1509,16 +1509,32 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
 </nav>
 <div class="tabs"><a class="{{'active' if profile == '4k' else ''}}" href="/proposals/4k">4K Food Service ({{count4k}})</a><a class="{{'active' if profile == 'digital' else ''}}" href="/proposals/digital">Presença digital ({{countdigital}})</a></div>
 <p class="muted">A IA ordena primeiro os estabelecimentos com melhores sinais públicos de aderência e possibilidade de resposta. O modo automático continua pesquisando, enriquecendo contatos e preparando rascunhos. Os links abrem WhatsApp com a mensagem ou o e-mail com assunto e texto preenchidos; revise antes de enviar. Nenhuma mensagem é disparada automaticamente.</p>
-{% for p in proposals %}<article class="entry"><h2>{{p.lead_name}}</h2><p class="muted">{{p.category}} · {{'4K Food Service' if p.profile == '4k' else 'Presença digital'}} · Prioridade de abordagem: <strong>{{p.score}}/100</strong></p>
-<p><strong>Canal encontrado:</strong> {{p.contact_type}} · {{p.contact_value or 'Contato comercial público'}}</p><p>{{p.justification}}</p><div class="draft">{{p.message}}</div>
+{% set ns = namespace(previous_lead=None, previous_name=None, group_index=0) %}
+{% for p in proposals %}
+{% if p.lead_id != ns.previous_lead %}
+{% if ns.previous_lead is not none %}</div></details>{% endif %}
+{% set ns.previous_lead = p.lead_id %}{% set ns.previous_name = p.lead_name %}{% set ns.group_index = ns.group_index + 1 %}
+<details class="entry proposal-group" {% if ns.group_index == 1 %}open{% endif %}>
+<summary style="cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap">
+<span><strong>{{p.lead_name}}</strong><span class="muted" style="display:block">{{p.category}} · {{p.address or 'Endereço não identificado'}}</span></span>
+<span class="pill">{{p.score}}/100 · {{'4K Food Service' if p.profile == '4k' else 'Presença digital'}}</span>
+</summary>
+<div style="border-top:1px solid #26354d;margin-top:16px;padding-top:10px">
+{% else %}{% endif %}
+<article class="entry" style="margin:12px 0;background:#0b1525!important">
+<h3>{{'4K Food Service' if p.profile == '4k' else 'Presença digital'}} · {{p.contact_type}}{% if p.contact_value %} — {{p.contact_value}}{% endif %}</h3>
+<p class="muted">Prioridade de abordagem: <strong>{{p.score}}/100</strong></p>
+<p>{{p.justification}}</p><div class="draft">{{p.message}}</div>
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
 {% if p.whatsapp_url %}<a class="btn" href="{{p.whatsapp_url}}" target="_blank" rel="noopener">Abrir WhatsApp com mensagem</a>{% endif %}
 {% if p.email_url %}<a class="btn" href="{{p.email_url}}" target="_blank" rel="noopener">Preparar e-mail</a>{% endif %}
 {% if p.phone_url %}<a class="btn" href="{{p.phone_url}}">Ligar</a>{% endif %}
 {% if p.maps_url %}<a class="btn" href="{{p.maps_url}}" target="_blank" rel="noopener">Ver no Google Maps</a>{% endif %}
 {% if p.source_url %}<a class="btn" href="{{p.source_url}}" target="_blank" rel="noopener">Fonte do contato</a>{% endif %}
-</div>
-<p class="muted">Rascunho preparado automaticamente em {{p.created_at}}. A pontuação é uma estimativa baseada nos dados públicos encontrados, não uma garantia de resposta. Revise a mensagem e a base legal antes de abordar. Nada é enviado automaticamente.</p></article>{% else %}<p class="muted">Ainda não há propostas para esta empresa. Ative o modo automático e aguarde a pesquisa e a coleta de contatos públicos.</p>{% endfor %}
+<p class="muted">Rascunho preparado em {{p.created_at}}. Revise antes de abordar. Nada é enviado automaticamente.</p>
+</article>
+{% if loop.last %}</div></details>{% endif %}
+{% else %}<p class="muted">Ainda não há propostas para esta empresa. Ative o modo automático e aguarde a pesquisa e a coleta de contatos públicos.</p>{% endfor %}
 </main>
 <script>
 /* Navegação contextual: sempre destaca a área atual do fluxo */
