@@ -563,12 +563,16 @@ def history():
     if selected not in {"all", "to_visit", "visited", "client"}:
         selected = "all"
     leads = [lead for lead in get_leads(path=db_path) if lead.get("status") not in {"in_person", "removed"}]
+    distributor_terms = ("distribuidora", "distribuidor", "distribuicao", "distribuição", "atacadista", "atacado", "food service", "foodservice")
     for lead in leads:
         if lead.get("status") not in STATUS_LABELS:
             lead["status"] = "to_visit"
         lead["status_label"] = STATUS_LABELS[lead["status"]]
+        searchable = f"{lead.get('name', '')} {lead.get('category', '')}".casefold()
+        lead["business_group"] = "Distribuidoras" if any(term in searchable for term in distributor_terms) else "Outros estabelecimentos"
     if selected != "all":
         leads = [lead for lead in leads if lead["status"] == selected]
+    leads.sort(key=lambda lead: (0 if lead["business_group"] == "Distribuidoras" else 1, str(lead.get("name") or "").casefold()))
     return render_template_string(HISTORY_PAGE, leads=leads, selected=selected, labels=STATUS_LABELS)
 
 
@@ -812,7 +816,15 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
 <a href="/history?status=client" class="{{ 'active' if selected == 'client' else '' }}">Clientes</a>
 </div>
 {% if not leads %}<div class="empty">Nenhum estabelecimento nesta categoria ainda. Faça uma busca para adicionar negócios ao histórico.</div>{% endif %}
-{% for lead in leads %}<article class="entry">
+{% set ns = namespace(group=None) %}
+{% for lead in leads %}
+{% if lead.business_group != ns.group %}
+{% if ns.group is not none %}</section>{% endif %}
+{% set ns.group = lead.business_group %}
+<section class="panel business-category" style="margin-top:18px">
+<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><h2 style="margin:0">{{ lead.business_group }}</h2><span class="pill">{% if lead.business_group == 'Distribuidoras' %}Distribuição e atacado{% else %}Demais categorias{% endif %}</span></div>
+{% endif %}
+<article class="entry">
 <div class="top"><div><h3>{{ lead.name }}</h3><div class="muted">{{ lead.category or "Categoria não identificada" }}</div></div><span class="pill">{{ lead.status_label }}</span></div>
 <div class="meta">
 <div><b>Telefone comercial</b>{{ lead.phone or "Não identificado publicamente" }}</div>
@@ -841,7 +853,10 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
 <label for="history-status-{{lead.id}}" class="muted">Alterar etapa:</label>
 <select id="history-status-{{lead.id}}" name="status">{% for value,label in labels.items() %}<option value="{{value}}" {% if lead.status == value %}selected{% endif %}>{{label}}</option>{% endfor %}</select>
 <button type="submit">Salvar</button></form>
-</article>{% endfor %}
+</article>
+{% if loop.last %}</section>{% endif %}
+{% endfor %}
+<p class="hint">O Mapeador classifica automaticamente como “Distribuidoras” os estabelecimentos cujo nome ou categoria pública contém termos de distribuição, atacado ou food service. Confira a classificação quando o cadastro tiver poucas informações.</p>
 <p class="hint">A busca ignora estabelecimentos já encontrados. Para criar uma mensagem, escolha a empresa e clique em “Gerar proposta”. O histórico fica neste computador, no banco SQLite local.</p>
 </section></main>
 <script>
