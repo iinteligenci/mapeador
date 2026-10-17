@@ -1599,7 +1599,7 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
  <div class="nav-group"><span>AUTOMAÇÃO</span><a href="/automatic">⚙ Modo automático</a></div>
 </nav>
 <div class="tabs"><a class="{{'active' if profile == '4k' else ''}}" href="/proposals/4k">4K Food Service ({{count4k}})</a><a class="{{'active' if profile == 'digital' else ''}}" href="/proposals/digital">Presença digital ({{countdigital}})</a></div>
-<p class="muted">A IA ordena primeiro os estabelecimentos com melhores sinais públicos de aderência e possibilidade de resposta. O modo automático continua pesquisando, enriquecendo contatos e preparando rascunhos. Os links abrem WhatsApp com a mensagem ou o e-mail com assunto e texto preenchidos; revise antes de enviar. Nenhuma mensagem é disparada automaticamente.</p>
+<p class="muted">A IA ordena primeiro os estabelecimentos com melhores sinais públicos de aderência e possibilidade de resposta. O modo automático continua pesquisando, enriquecendo contatos e preparando rascunhos. Os links abrem WhatsApp com a mensagem ou o e-mail com assunto e texto preenchidos; revise antes de enviar. Nenhuma mensagem é disparada automaticamente.</p><p><a class="btn" href="{{ share_proposals_url }}" target="_blank" rel="noopener">Compartilhar resumo das 10 melhores propostas no WhatsApp</a></p>
 {% set ns = namespace(previous_lead=None, previous_name=None, group_index=0) %}
 {% for p in proposals %}
 {% if p.lead_id != ns.previous_lead %}
@@ -1715,7 +1715,20 @@ def proposals_page(profile: str):
                     proposal["whatsapp_url"] = "https://wa.me/" + fallback_digits + "?text=" + quote(str(proposal.get("message") or ""))
         proposal["maps_url"] = str(proposal.get("maps_url") or "")
     proposals = [p for p in all_proposals if p.get("profile") == profile]
-    return render_template_string(PROPOSALS_PAGE, profile=profile, proposals=proposals,
+    proposals.sort(key=lambda p: int(p.get("score") or 0), reverse=True)
+    report_lines = ["MAPEADOR — MELHORES PROPOSTAS", "Perfil: " + ("4K Food Service" if profile == "4k" else "Presença digital"), ""]
+    for proposal in proposals[:10]:
+        report_lines.append(f"• {proposal.get('lead_name') or 'Estabelecimento'} — prioridade {proposal.get('score', 0)}/100")
+        report_lines.append(f"  Endereço: {proposal.get('address') or 'Não identificado'}")
+        contact = proposal.get("contact_value") or proposal.get("contact_phone") or proposal.get("contact_whatsapp") or proposal.get("phone") or ""
+        if contact:
+            report_lines.append(f"  Contato: {contact}")
+        map_url = proposal.get("maps_url") or ("https://www.google.com/maps/search/?api=1&query=" + quote(str(proposal.get("lead_name") or "") + " " + str(proposal.get("address") or "")))
+        report_lines.append(f"  Mapa: {map_url}")
+        report_lines.append(f"  Mensagem sugerida: {proposal.get('message') or ''}")
+        report_lines.append("")
+    share_proposals_url = "https://wa.me/?text=" + quote("\\n".join(report_lines))
+    return render_template_string(PROPOSALS_PAGE, profile=profile, proposals=proposals, share_proposals_url=share_proposals_url,
         count4k=sum(1 for p in all_proposals if p.get("profile") == "4k"),
         countdigital=sum(1 for p in all_proposals if p.get("profile") == "digital"))
 
