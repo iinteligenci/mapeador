@@ -17,7 +17,8 @@ from flask import Flask, redirect, render_template_string, request, url_for, abo
 from ai_agent.analyzer import analyze_lead_profiles
 from ai_agent.research_planner import plan_deep_searches
 from ai_agent.deep_enrichment import enrich_business_with_ai
-from database.db import (get_leads, init_db, save_lead, update_analysis, update_lead_status, update_public_contacts, update_business_identity, save_campaign, get_campaigns, queue_campaign, get_campaign_leads, update_campaign_event, get_automation_settings, set_automation_settings, save_proposal, get_proposals, save_sales_example, get_sales_examples)\nfrom ai_agent.sales_agent import draft_sales_reply
+from database.db import (get_leads, init_db, save_lead, update_analysis, update_lead_status, update_public_contacts, update_business_identity, save_campaign, get_campaigns, queue_campaign, get_campaign_leads, update_campaign_event, get_automation_settings, set_automation_settings, save_proposal, get_proposals, save_sales_example, get_sales_examples)
+from ai_agent.sales_agent import draft_sales_reply
 from scraper.maps_scraper import search_google_maps, fetch_place_address
 from scraper.public_contacts import find_public_business_contacts
 from scraper.site_research import research_public_site
