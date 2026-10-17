@@ -280,6 +280,23 @@ document.getElementById('searchForm').addEventListener('submit', function(){
  const b=document.getElementById('submitButton'); b.disabled=true; b.textContent='Pesquisando… aguarde';
 });
 </script>
+
+<script>
+/* Navegação contextual: sempre destaca a área atual do fluxo */
+(function(){
+  const path = window.location.pathname.replace(/\\/$/, '') || '/';
+  document.querySelectorAll('.nav a[href]').forEach(function(link){
+    const href = link.getAttribute('href');
+    let active = href === path;
+    if (href === '/campaigns' && path.startsWith('/campaigns/')) active = true;
+    if (href.startsWith('/proposals/') && path.startsWith('/proposals/')) active = href === path;
+    if (active) { link.classList.add('active'); link.setAttribute('aria-current','page'); }
+  });
+  const nav = document.querySelector('.nav');
+  if (nav) nav.setAttribute('aria-label','Menu principal do Mapeador');
+})();
+</script>
+
 </body></html>
 """
 
@@ -823,7 +840,24 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
 <button type="submit">Salvar</button></form>
 </article>{% endfor %}
 <p class="hint">A busca ignora estabelecimentos já encontrados. Para criar uma mensagem, escolha a empresa e clique em “Gerar proposta”. O histórico fica neste computador, no banco SQLite local.</p>
-</section></main></body></html>
+</section></main>
+<script>
+/* Navegação contextual: sempre destaca a área atual do fluxo */
+(function(){
+  const path = window.location.pathname.replace(/\\/$/, '') || '/';
+  document.querySelectorAll('.nav a[href]').forEach(function(link){
+    const href = link.getAttribute('href');
+    let active = href === path;
+    if (href === '/campaigns' && path.startsWith('/campaigns/')) active = true;
+    if (href.startsWith('/proposals/') && path.startsWith('/proposals/')) active = href === path;
+    if (active) { link.classList.add('active'); link.setAttribute('aria-current','page'); }
+  });
+  const nav = document.querySelector('.nav');
+  if (nav) nav.setAttribute('aria-label','Menu principal do Mapeador');
+})();
+</script>
+
+</body></html>
 """
 
 ROUTES_PAGE = r"""
@@ -946,7 +980,24 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
 {% if lead.address %}<a href="https://www.google.com/maps/search/?api=1&query={{ lead.address|urlencode }}" target="_blank" rel="noopener">Abrir endereço no Google Maps ↗</a>{% elif lead.link %}<a href="{{ lead.link }}" target="_blank" rel="noopener">Ver estabelecimento no Google Maps ↗</a>{% endif %}
 </article>{% endfor %}</details>{% endfor %}
 <p class="muted">O bairro é identificado a partir do endereço cadastrado. Quando não há informação suficiente, o estabelecimento fica em “Bairro não identificado” para evitar agrupamentos incorretos.</p>
-</section></main></body></html>
+</section></main>
+<script>
+/* Navegação contextual: sempre destaca a área atual do fluxo */
+(function(){
+  const path = window.location.pathname.replace(/\\/$/, '') || '/';
+  document.querySelectorAll('.nav a[href]').forEach(function(link){
+    const href = link.getAttribute('href');
+    let active = href === path;
+    if (href === '/campaigns' && path.startsWith('/campaigns/')) active = true;
+    if (href.startsWith('/proposals/') && path.startsWith('/proposals/')) active = href === path;
+    if (active) { link.classList.add('active'); link.setAttribute('aria-current','page'); }
+  });
+  const nav = document.querySelector('.nav');
+  if (nav) nav.setAttribute('aria-label','Menu principal do Mapeador');
+})();
+</script>
+
+</body></html>
 """
 
 
@@ -1066,7 +1117,24 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
 <label>Termo para continuar prospectando (opcional)</label><input name="search_term" placeholder="Ex.: restaurantes em Vila Velha ES">
 <label>Mensagem que será usada no WhatsApp</label><textarea name="message" rows="6" required placeholder="Escreva e revise a mensagem antes de criar a campanha."></textarea>
 <button type="submit">Salvar mensagem e preparar lista</button></form><p class="muted">A lista inclui contatos públicos já cadastrados. Antes de contatar alguém, confirme que há base legal e autorização apropriada; respeite pedidos para não receber mensagens.</p></section>
-<section class="panel"><h2>Campanhas salvas</h2>{% for c in campaigns %}<div class="entry"><strong>{{c.name}}</strong> · {{'4K Food Service' if c.profile == '4k' else 'Presença Digital'}}<p class="muted">{{c.created_at}} · {{c.queued_count}} contatos na fila{% if c.search_term %} · busca contínua: {{c.search_term}}{% endif %}</p><a class="btn" href="/campaigns/{{c.id}}">Abrir campanha</a></div>{% else %}<p class="muted">Nenhuma campanha criada ainda.</p>{% endfor %}</section></main></body></html>
+<section class="panel"><h2>Campanhas salvas</h2>{% for c in campaigns %}<div class="entry"><strong>{{c.name}}</strong> · {{'4K Food Service' if c.profile == '4k' else 'Presença Digital'}}<p class="muted">{{c.created_at}} · {{c.queued_count}} contatos na fila{% if c.search_term %} · busca contínua: {{c.search_term}}{% endif %}</p><a class="btn" href="/campaigns/{{c.id}}">Abrir campanha</a></div>{% else %}<p class="muted">Nenhuma campanha criada ainda.</p>{% endfor %}</section></main>
+<script>
+/* Navegação contextual: sempre destaca a área atual do fluxo */
+(function(){
+  const path = window.location.pathname.replace(/\\/$/, '') || '/';
+  document.querySelectorAll('.nav a[href]').forEach(function(link){
+    const href = link.getAttribute('href');
+    let active = href === path;
+    if (href === '/campaigns' && path.startsWith('/campaigns/')) active = true;
+    if (href.startsWith('/proposals/') && path.startsWith('/proposals/')) active = href === path;
+    if (active) { link.classList.add('active'); link.setAttribute('aria-current','page'); }
+  });
+  const nav = document.querySelector('.nav');
+  if (nav) nav.setAttribute('aria-label','Menu principal do Mapeador');
+})();
+</script>
+
+</body></html>
 """
 
 CAMPAIGN_DETAIL_PAGE = r"""
@@ -1172,7 +1240,24 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
 {% for lead in leads %}<article class="entry"><h3>{{lead.name}}</h3><p>{{lead.category}} · {{lead.chosen_phone or 'Sem telefone público'}}</p><p class="muted">WhatsApp: {{lead.contact_whatsapp or 'não confirmado'}} · CNPJ: {{lead.cnpj or 'não identificado publicamente'}}</p>
 {% if lead.wa_url %}<a class="btn" href="{{lead.wa_url}}" target="_blank" rel="noopener">Abrir mensagem no WhatsApp</a>{% else %}<p class="muted">Número ausente ou inválido para link do WhatsApp.</p>{% endif %}
 <form method="post" action="/campaigns/event"><input type="hidden" name="campaign_id" value="{{campaign.id}}"><input type="hidden" name="lead_id" value="{{lead.id}}"><label><input type="checkbox" name="consent" value="yes" {% if lead.consent_confirmed %}checked{% endif %}> Confirmo que posso contatar este estabelecimento</label><select name="status"><option value="pending" {% if lead.campaign_status == 'pending' %}selected{% endif %}>Pendente</option><option value="opened" {% if lead.campaign_status == 'opened' %}selected{% endif %}>Conversa aberta</option><option value="sent" {% if lead.campaign_status == 'sent' %}selected{% endif %}>Mensagem enviada manualmente</option><option value="replied" {% if lead.campaign_status == 'replied' %}selected{% endif %}>Respondeu</option><option value="opted_out" {% if lead.campaign_status == 'opted_out' %}selected{% endif %}>Não deseja contato</option></select><button type="submit">Salvar status</button></form>
-{% if lead.campaign_status == 'opted_out' %}<p class="muted">Este contato marcou que não deseja contato nesta campanha. Não o contate novamente.</p>{% endif %}</article>{% else %}<p>Nenhum contato na fila. Pesquise e cadastre estabelecimentos primeiro.</p>{% endfor %}</main></body></html>
+{% if lead.campaign_status == 'opted_out' %}<p class="muted">Este contato marcou que não deseja contato nesta campanha. Não o contate novamente.</p>{% endif %}</article>{% else %}<p>Nenhum contato na fila. Pesquise e cadastre estabelecimentos primeiro.</p>{% endfor %}</main>
+<script>
+/* Navegação contextual: sempre destaca a área atual do fluxo */
+(function(){
+  const path = window.location.pathname.replace(/\\/$/, '') || '/';
+  document.querySelectorAll('.nav a[href]').forEach(function(link){
+    const href = link.getAttribute('href');
+    let active = href === path;
+    if (href === '/campaigns' && path.startsWith('/campaigns/')) active = true;
+    if (href.startsWith('/proposals/') && path.startsWith('/proposals/')) active = href === path;
+    if (active) { link.classList.add('active'); link.setAttribute('aria-current','page'); }
+  });
+  const nav = document.querySelector('.nav');
+  if (nav) nav.setAttribute('aria-label','Menu principal do Mapeador');
+})();
+</script>
+
+</body></html>
 """
 
 
@@ -1294,7 +1379,24 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
 <label>Limite de novos negócios por busca</label><select name="batch_size">{% for n in [1,2,3,5,10] %}<option value="{{n}}" {% if settings.batch_size == n %}selected{% endif %}>{{n}}</option>{% endfor %}</select>
 <button type="submit">Salvar configuração</button></form>
 <p class="muted">Quando ligada, a automação trabalha continuamente: termina uma tarefa e segue para a próxima, sem esperar 5 minutos entre ciclos. Se não houver trabalho disponível, faz uma pausa curta antes de verificar novamente. O computador e o programa precisam permanecer ligados. Limites de acesso, falhas de sites e limites da API podem atrasar a pesquisa; o sistema não contorna bloqueios.</p>
-<p class="muted"><strong>Importante:</strong> propostas são apenas rascunhos para revisão humana. O Mapeador não envia mensagens automaticamente. Contatos só são usados quando encontrados em páginas públicas; dados não confirmados não são inventados.</p></section></main></body></html>
+<p class="muted"><strong>Importante:</strong> propostas são apenas rascunhos para revisão humana. O Mapeador não envia mensagens automaticamente. Contatos só são usados quando encontrados em páginas públicas; dados não confirmados não são inventados.</p></section></main>
+<script>
+/* Navegação contextual: sempre destaca a área atual do fluxo */
+(function(){
+  const path = window.location.pathname.replace(/\\/$/, '') || '/';
+  document.querySelectorAll('.nav a[href]').forEach(function(link){
+    const href = link.getAttribute('href');
+    let active = href === path;
+    if (href === '/campaigns' && path.startsWith('/campaigns/')) active = true;
+    if (href.startsWith('/proposals/') && path.startsWith('/proposals/')) active = href === path;
+    if (active) { link.classList.add('active'); link.setAttribute('aria-current','page'); }
+  });
+  const nav = document.querySelector('.nav');
+  if (nav) nav.setAttribute('aria-label','Menu principal do Mapeador');
+})();
+</script>
+
+</body></html>
 """
 
 PROPOSALS_PAGE = r"""
@@ -1408,7 +1510,24 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
 <p><strong>Canal:</strong> {{p.contact_type}} · {{p.contact_value or 'Contato comercial público'}}</p><p>{{p.justification}}</p><div class="draft">{{p.message}}</div>
 {% if p.source_url %}<p><a href="{{p.source_url}}" target="_blank" rel="noopener">Ver fonte pública do contato</a></p>{% endif %}
 <p class="muted">Rascunho salvo em {{p.created_at}}. Revise os dados, a adequação da oferta e a base legal antes de qualquer abordagem.</p></article>{% else %}<p class="muted">Ainda não há propostas para esta empresa. Ative o modo automático e aguarde a pesquisa e a coleta de contatos públicos.</p>{% endfor %}
-</main></body></html>
+</main>
+<script>
+/* Navegação contextual: sempre destaca a área atual do fluxo */
+(function(){
+  const path = window.location.pathname.replace(/\\/$/, '') || '/';
+  document.querySelectorAll('.nav a[href]').forEach(function(link){
+    const href = link.getAttribute('href');
+    let active = href === path;
+    if (href === '/campaigns' && path.startsWith('/campaigns/')) active = true;
+    if (href.startsWith('/proposals/') && path.startsWith('/proposals/')) active = href === path;
+    if (active) { link.classList.add('active'); link.setAttribute('aria-current','page'); }
+  });
+  const nav = document.querySelector('.nav');
+  if (nav) nav.setAttribute('aria-label','Menu principal do Mapeador');
+})();
+</script>
+
+</body></html>
 """
 
 
