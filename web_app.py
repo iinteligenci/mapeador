@@ -119,6 +119,53 @@ button:focus-visible,.btn:focus-visible,a:focus-visible{outline:2px solid var(--
 @media(max-width:760px){main{width:calc(100% - 24px)!important;padding-top:18px!important}.nav{display:grid!important;grid-template-columns:1fr 1fr!important;padding:8px!important;gap:6px!important}.nav-group{min-width:0!important;padding:6px!important}.nav-group a{width:100%!important}.panel{padding:16px!important}.details,.formgrid{grid-template-columns:1fr!important}}
 @media(max-width:440px){.nav{grid-template-columns:1fr!important}.nav-group{display:grid!important;grid-template-columns:1fr!important}.nav-group>span{grid-column:1/-1}}
 
+
+/* MAPeADOR PRODUCT UI v2 — layout inspirado em CRMs e ferramentas SaaS */
+:root{color-scheme:dark;--app-bg:#080d17;--sidebar:#0b1220;--surface:#101a2b;--surface-2:#131f33;--border:#24334a;--text:#e8eef8;--muted:#8fa1bb;--accent:#6aaeff;--accent-soft:#142d4b;--success:#3bc99a;--radius:14px}
+html{scroll-behavior:smooth}
+body{margin:0!important;background:var(--app-bg)!important;color:var(--text)!important;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;font-size:14px!important;line-height:1.55!important}
+main{width:auto!important;max-width:1440px!important;margin:0 0 0 276px!important;padding:34px clamp(20px,3vw,48px) 64px!important}
+header{margin-bottom:24px}
+.brand{margin-bottom:8px!important;gap:13px!important}
+.mark{width:42px!important;height:42px!important;border-radius:12px!important;background:linear-gradient(145deg,#76baff,#3d78e8)!important;box-shadow:0 8px 24px #347ce833!important;font-size:21px!important}
+h1{font-size:clamp(25px,2vw,32px)!important;line-height:1.2!important;letter-spacing:-.035em!important;font-weight:760!important}
+h2{font-size:17px!important;letter-spacing:-.02em!important;font-weight:720!important;margin-bottom:15px!important}
+h3{font-size:16px!important;font-weight:700!important}
+.sub{color:var(--muted)!important;font-size:14px!important;margin:8px 0 18px!important;max-width:760px}
+.panel,.entry,.lead,.neighborhood,article{background:var(--surface)!important;border:1px solid var(--border)!important;border-radius:var(--radius)!important;box-shadow:0 8px 24px #00000012!important}
+.panel{padding:clamp(18px,2vw,26px)!important;margin:16px 0 20px!important}
+.entry,.lead{padding:19px!important}
+.stat{background:#0c1524!important;border:1px solid var(--border)!important;border-radius:12px!important}
+.stat strong{font-size:26px!important;letter-spacing:-.04em!important}
+label,.muted,.note,.category{color:var(--muted)!important}
+label{font-size:12px!important;font-weight:650!important;letter-spacing:.01em!important}
+input,select,textarea{box-sizing:border-box!important;background:#0a1322!important;color:var(--text)!important;border:1px solid #2a3b54!important;border-radius:9px!important;padding:11px 12px!important;font:inherit!important;min-height:42px!important;transition:border-color .15s,box-shadow .15s}
+input:focus,select:focus,textarea:focus{outline:0!important;border-color:var(--accent)!important;box-shadow:0 0 0 3px #6aaeff20!important}
+button,.btn{display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:8px!important;background:#6aaeff!important;color:#071323!important;border:1px solid #82bbff!important;border-radius:9px!important;padding:10px 15px!important;font-size:13px!important;font-weight:750!important;text-decoration:none!important;box-shadow:none!important;transition:background .15s,border-color .15s,transform .15s}
+button:hover,.btn:hover{background:#8ac2ff!important;transform:translateY(-1px)}
+button:disabled{opacity:.55;cursor:wait}
+a{color:#8fc6ff}
+a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;outline-offset:3px!important}
+.nav{position:fixed!important;z-index:100!important;left:0!important;top:0!important;bottom:0!important;width:252px!important;height:100dvh!important;overflow-y:auto!important;display:flex!important;flex-direction:column!important;align-items:stretch!important;justify-content:flex-start!important;gap:20px!important;margin:0!important;padding:25px 14px 22px!important;background:linear-gradient(180deg,#0c1525,#0a111e)!important;border:0!important;border-right:1px solid #202d42!important;border-radius:0!important;box-shadow:8px 0 28px #00000016!important}
+.nav:before{content:"MAPEADOR  /  WORKSPACE";display:block;padding:0 10px 17px;border-bottom:1px solid #202d42;color:#8297b4;font-size:10px;font-weight:800;letter-spacing:.14em}
+.nav-group{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:4px!important;flex:0 0 auto!important;min-width:0!important;padding:0!important;background:transparent!important;border:0!important;border-radius:0!important}
+.nav-group>span{width:auto!important;padding:0 10px 8px!important;color:#7186a3!important;font-size:10px!important;letter-spacing:.13em!important;font-weight:800!important}
+.nav a{display:flex!important;align-items:center!important;gap:10px!important;width:100%!important;min-height:38px!important;padding:9px 10px!important;background:transparent!important;border:1px solid transparent!important;border-radius:8px!important;color:#aebdd1!important;font-size:13px!important;font-weight:570!important;line-height:1.35!important;white-space:normal!important;text-decoration:none!important;transition:background .14s,color .14s,border-color .14s!important}
+.nav a:hover{background:#142238!important;border-color:#1d304b!important;color:#f0f6ff!important;transform:none!important}
+.nav a[aria-current="page"],.nav a.active{background:#17375b!important;border-color:#244c78!important;color:#fff!important;font-weight:700!important}
+.nav a[aria-current="page"]:before,.nav a.active:before{content:"";width:3px;height:18px;border-radius:5px;background:#6aaeff;position:absolute;left:0}
+.nav a{position:relative!important}
+.nav-group>span{display:block!important}
+.filters{gap:7px!important}
+.filters a,.tabs a{border:1px solid var(--border)!important;border-radius:8px!important;background:#0c1524!important;color:#b8c8dd!important;text-decoration:none!important}
+.filters a.active,.tabs a.active,.active{background:#17375b!important;border-color:#2d5d91!important;color:#fff!important}
+.pill,.score{font-size:11px!important;font-weight:750!important;letter-spacing:.01em}
+.alert{border-radius:10px!important}
+.footer{color:#7186a3!important}
+@media(max-width:900px){main{margin-left:252px!important;padding:25px 20px 48px!important}.nav{width:228px!important}}
+@media(max-width:680px){main{margin:0!important;padding:18px 14px 40px!important}.nav{position:relative!important;width:auto!important;height:auto!important;bottom:auto!important;left:auto!important;top:auto!important;display:flex!important;flex-direction:column!important;gap:13px!important;margin:18px 0 24px!important;padding:14px!important;border:1px solid var(--border)!important;border-radius:13px!important;box-shadow:none!important}.nav:before{padding-bottom:11px}.nav-group{display:grid!important;grid-template-columns:1fr 1fr!important;gap:5px!important}.nav-group>span{grid-column:1/-1!important}.nav a{min-height:36px!important;padding:8px!important;font-size:12px!important}.panel{padding:16px!important}.details,.meta,.formgrid{grid-template-columns:1fr!important}.stats{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+@media(max-width:390px){.nav-group{grid-template-columns:1fr!important}.nav-group>span{grid-column:1!important}.stats{grid-template-columns:1fr!important}}
+
 </style>
 </head>
 <body><main>
@@ -682,6 +729,53 @@ button:focus-visible,.btn:focus-visible,a:focus-visible{outline:2px solid var(--
 @media(max-width:760px){main{width:calc(100% - 24px)!important;padding-top:18px!important}.nav{display:grid!important;grid-template-columns:1fr 1fr!important;padding:8px!important;gap:6px!important}.nav-group{min-width:0!important;padding:6px!important}.nav-group a{width:100%!important}.panel{padding:16px!important}.details,.formgrid{grid-template-columns:1fr!important}}
 @media(max-width:440px){.nav{grid-template-columns:1fr!important}.nav-group{display:grid!important;grid-template-columns:1fr!important}.nav-group>span{grid-column:1/-1}}
 
+
+/* MAPeADOR PRODUCT UI v2 — layout inspirado em CRMs e ferramentas SaaS */
+:root{color-scheme:dark;--app-bg:#080d17;--sidebar:#0b1220;--surface:#101a2b;--surface-2:#131f33;--border:#24334a;--text:#e8eef8;--muted:#8fa1bb;--accent:#6aaeff;--accent-soft:#142d4b;--success:#3bc99a;--radius:14px}
+html{scroll-behavior:smooth}
+body{margin:0!important;background:var(--app-bg)!important;color:var(--text)!important;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;font-size:14px!important;line-height:1.55!important}
+main{width:auto!important;max-width:1440px!important;margin:0 0 0 276px!important;padding:34px clamp(20px,3vw,48px) 64px!important}
+header{margin-bottom:24px}
+.brand{margin-bottom:8px!important;gap:13px!important}
+.mark{width:42px!important;height:42px!important;border-radius:12px!important;background:linear-gradient(145deg,#76baff,#3d78e8)!important;box-shadow:0 8px 24px #347ce833!important;font-size:21px!important}
+h1{font-size:clamp(25px,2vw,32px)!important;line-height:1.2!important;letter-spacing:-.035em!important;font-weight:760!important}
+h2{font-size:17px!important;letter-spacing:-.02em!important;font-weight:720!important;margin-bottom:15px!important}
+h3{font-size:16px!important;font-weight:700!important}
+.sub{color:var(--muted)!important;font-size:14px!important;margin:8px 0 18px!important;max-width:760px}
+.panel,.entry,.lead,.neighborhood,article{background:var(--surface)!important;border:1px solid var(--border)!important;border-radius:var(--radius)!important;box-shadow:0 8px 24px #00000012!important}
+.panel{padding:clamp(18px,2vw,26px)!important;margin:16px 0 20px!important}
+.entry,.lead{padding:19px!important}
+.stat{background:#0c1524!important;border:1px solid var(--border)!important;border-radius:12px!important}
+.stat strong{font-size:26px!important;letter-spacing:-.04em!important}
+label,.muted,.note,.category{color:var(--muted)!important}
+label{font-size:12px!important;font-weight:650!important;letter-spacing:.01em!important}
+input,select,textarea{box-sizing:border-box!important;background:#0a1322!important;color:var(--text)!important;border:1px solid #2a3b54!important;border-radius:9px!important;padding:11px 12px!important;font:inherit!important;min-height:42px!important;transition:border-color .15s,box-shadow .15s}
+input:focus,select:focus,textarea:focus{outline:0!important;border-color:var(--accent)!important;box-shadow:0 0 0 3px #6aaeff20!important}
+button,.btn{display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:8px!important;background:#6aaeff!important;color:#071323!important;border:1px solid #82bbff!important;border-radius:9px!important;padding:10px 15px!important;font-size:13px!important;font-weight:750!important;text-decoration:none!important;box-shadow:none!important;transition:background .15s,border-color .15s,transform .15s}
+button:hover,.btn:hover{background:#8ac2ff!important;transform:translateY(-1px)}
+button:disabled{opacity:.55;cursor:wait}
+a{color:#8fc6ff}
+a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;outline-offset:3px!important}
+.nav{position:fixed!important;z-index:100!important;left:0!important;top:0!important;bottom:0!important;width:252px!important;height:100dvh!important;overflow-y:auto!important;display:flex!important;flex-direction:column!important;align-items:stretch!important;justify-content:flex-start!important;gap:20px!important;margin:0!important;padding:25px 14px 22px!important;background:linear-gradient(180deg,#0c1525,#0a111e)!important;border:0!important;border-right:1px solid #202d42!important;border-radius:0!important;box-shadow:8px 0 28px #00000016!important}
+.nav:before{content:"MAPEADOR  /  WORKSPACE";display:block;padding:0 10px 17px;border-bottom:1px solid #202d42;color:#8297b4;font-size:10px;font-weight:800;letter-spacing:.14em}
+.nav-group{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:4px!important;flex:0 0 auto!important;min-width:0!important;padding:0!important;background:transparent!important;border:0!important;border-radius:0!important}
+.nav-group>span{width:auto!important;padding:0 10px 8px!important;color:#7186a3!important;font-size:10px!important;letter-spacing:.13em!important;font-weight:800!important}
+.nav a{display:flex!important;align-items:center!important;gap:10px!important;width:100%!important;min-height:38px!important;padding:9px 10px!important;background:transparent!important;border:1px solid transparent!important;border-radius:8px!important;color:#aebdd1!important;font-size:13px!important;font-weight:570!important;line-height:1.35!important;white-space:normal!important;text-decoration:none!important;transition:background .14s,color .14s,border-color .14s!important}
+.nav a:hover{background:#142238!important;border-color:#1d304b!important;color:#f0f6ff!important;transform:none!important}
+.nav a[aria-current="page"],.nav a.active{background:#17375b!important;border-color:#244c78!important;color:#fff!important;font-weight:700!important}
+.nav a[aria-current="page"]:before,.nav a.active:before{content:"";width:3px;height:18px;border-radius:5px;background:#6aaeff;position:absolute;left:0}
+.nav a{position:relative!important}
+.nav-group>span{display:block!important}
+.filters{gap:7px!important}
+.filters a,.tabs a{border:1px solid var(--border)!important;border-radius:8px!important;background:#0c1524!important;color:#b8c8dd!important;text-decoration:none!important}
+.filters a.active,.tabs a.active,.active{background:#17375b!important;border-color:#2d5d91!important;color:#fff!important}
+.pill,.score{font-size:11px!important;font-weight:750!important;letter-spacing:.01em}
+.alert{border-radius:10px!important}
+.footer{color:#7186a3!important}
+@media(max-width:900px){main{margin-left:252px!important;padding:25px 20px 48px!important}.nav{width:228px!important}}
+@media(max-width:680px){main{margin:0!important;padding:18px 14px 40px!important}.nav{position:relative!important;width:auto!important;height:auto!important;bottom:auto!important;left:auto!important;top:auto!important;display:flex!important;flex-direction:column!important;gap:13px!important;margin:18px 0 24px!important;padding:14px!important;border:1px solid var(--border)!important;border-radius:13px!important;box-shadow:none!important}.nav:before{padding-bottom:11px}.nav-group{display:grid!important;grid-template-columns:1fr 1fr!important;gap:5px!important}.nav-group>span{grid-column:1/-1!important}.nav a{min-height:36px!important;padding:8px!important;font-size:12px!important}.panel{padding:16px!important}.details,.meta,.formgrid{grid-template-columns:1fr!important}.stats{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+@media(max-width:390px){.nav-group{grid-template-columns:1fr!important}.nav-group>span{grid-column:1!important}.stats{grid-template-columns:1fr!important}}
+
 </style></head><body><main>
 <header><div class="brand"><div class="mark">M</div><div><h1>Estabelecimentos encontrados</h1><div class="muted">Seu histórico comercial fica salvo no banco local.</div></div></div>
 <nav class="nav" aria-label="Navegação principal">
@@ -787,6 +881,53 @@ button:focus-visible,.btn:focus-visible,a:focus-visible{outline:2px solid var(--
 @media(max-width:760px){main{width:calc(100% - 24px)!important;padding-top:18px!important}.nav{display:grid!important;grid-template-columns:1fr 1fr!important;padding:8px!important;gap:6px!important}.nav-group{min-width:0!important;padding:6px!important}.nav-group a{width:100%!important}.panel{padding:16px!important}.details,.formgrid{grid-template-columns:1fr!important}}
 @media(max-width:440px){.nav{grid-template-columns:1fr!important}.nav-group{display:grid!important;grid-template-columns:1fr!important}.nav-group>span{grid-column:1/-1}}
 
+
+/* MAPeADOR PRODUCT UI v2 — layout inspirado em CRMs e ferramentas SaaS */
+:root{color-scheme:dark;--app-bg:#080d17;--sidebar:#0b1220;--surface:#101a2b;--surface-2:#131f33;--border:#24334a;--text:#e8eef8;--muted:#8fa1bb;--accent:#6aaeff;--accent-soft:#142d4b;--success:#3bc99a;--radius:14px}
+html{scroll-behavior:smooth}
+body{margin:0!important;background:var(--app-bg)!important;color:var(--text)!important;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;font-size:14px!important;line-height:1.55!important}
+main{width:auto!important;max-width:1440px!important;margin:0 0 0 276px!important;padding:34px clamp(20px,3vw,48px) 64px!important}
+header{margin-bottom:24px}
+.brand{margin-bottom:8px!important;gap:13px!important}
+.mark{width:42px!important;height:42px!important;border-radius:12px!important;background:linear-gradient(145deg,#76baff,#3d78e8)!important;box-shadow:0 8px 24px #347ce833!important;font-size:21px!important}
+h1{font-size:clamp(25px,2vw,32px)!important;line-height:1.2!important;letter-spacing:-.035em!important;font-weight:760!important}
+h2{font-size:17px!important;letter-spacing:-.02em!important;font-weight:720!important;margin-bottom:15px!important}
+h3{font-size:16px!important;font-weight:700!important}
+.sub{color:var(--muted)!important;font-size:14px!important;margin:8px 0 18px!important;max-width:760px}
+.panel,.entry,.lead,.neighborhood,article{background:var(--surface)!important;border:1px solid var(--border)!important;border-radius:var(--radius)!important;box-shadow:0 8px 24px #00000012!important}
+.panel{padding:clamp(18px,2vw,26px)!important;margin:16px 0 20px!important}
+.entry,.lead{padding:19px!important}
+.stat{background:#0c1524!important;border:1px solid var(--border)!important;border-radius:12px!important}
+.stat strong{font-size:26px!important;letter-spacing:-.04em!important}
+label,.muted,.note,.category{color:var(--muted)!important}
+label{font-size:12px!important;font-weight:650!important;letter-spacing:.01em!important}
+input,select,textarea{box-sizing:border-box!important;background:#0a1322!important;color:var(--text)!important;border:1px solid #2a3b54!important;border-radius:9px!important;padding:11px 12px!important;font:inherit!important;min-height:42px!important;transition:border-color .15s,box-shadow .15s}
+input:focus,select:focus,textarea:focus{outline:0!important;border-color:var(--accent)!important;box-shadow:0 0 0 3px #6aaeff20!important}
+button,.btn{display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:8px!important;background:#6aaeff!important;color:#071323!important;border:1px solid #82bbff!important;border-radius:9px!important;padding:10px 15px!important;font-size:13px!important;font-weight:750!important;text-decoration:none!important;box-shadow:none!important;transition:background .15s,border-color .15s,transform .15s}
+button:hover,.btn:hover{background:#8ac2ff!important;transform:translateY(-1px)}
+button:disabled{opacity:.55;cursor:wait}
+a{color:#8fc6ff}
+a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;outline-offset:3px!important}
+.nav{position:fixed!important;z-index:100!important;left:0!important;top:0!important;bottom:0!important;width:252px!important;height:100dvh!important;overflow-y:auto!important;display:flex!important;flex-direction:column!important;align-items:stretch!important;justify-content:flex-start!important;gap:20px!important;margin:0!important;padding:25px 14px 22px!important;background:linear-gradient(180deg,#0c1525,#0a111e)!important;border:0!important;border-right:1px solid #202d42!important;border-radius:0!important;box-shadow:8px 0 28px #00000016!important}
+.nav:before{content:"MAPEADOR  /  WORKSPACE";display:block;padding:0 10px 17px;border-bottom:1px solid #202d42;color:#8297b4;font-size:10px;font-weight:800;letter-spacing:.14em}
+.nav-group{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:4px!important;flex:0 0 auto!important;min-width:0!important;padding:0!important;background:transparent!important;border:0!important;border-radius:0!important}
+.nav-group>span{width:auto!important;padding:0 10px 8px!important;color:#7186a3!important;font-size:10px!important;letter-spacing:.13em!important;font-weight:800!important}
+.nav a{display:flex!important;align-items:center!important;gap:10px!important;width:100%!important;min-height:38px!important;padding:9px 10px!important;background:transparent!important;border:1px solid transparent!important;border-radius:8px!important;color:#aebdd1!important;font-size:13px!important;font-weight:570!important;line-height:1.35!important;white-space:normal!important;text-decoration:none!important;transition:background .14s,color .14s,border-color .14s!important}
+.nav a:hover{background:#142238!important;border-color:#1d304b!important;color:#f0f6ff!important;transform:none!important}
+.nav a[aria-current="page"],.nav a.active{background:#17375b!important;border-color:#244c78!important;color:#fff!important;font-weight:700!important}
+.nav a[aria-current="page"]:before,.nav a.active:before{content:"";width:3px;height:18px;border-radius:5px;background:#6aaeff;position:absolute;left:0}
+.nav a{position:relative!important}
+.nav-group>span{display:block!important}
+.filters{gap:7px!important}
+.filters a,.tabs a{border:1px solid var(--border)!important;border-radius:8px!important;background:#0c1524!important;color:#b8c8dd!important;text-decoration:none!important}
+.filters a.active,.tabs a.active,.active{background:#17375b!important;border-color:#2d5d91!important;color:#fff!important}
+.pill,.score{font-size:11px!important;font-weight:750!important;letter-spacing:.01em}
+.alert{border-radius:10px!important}
+.footer{color:#7186a3!important}
+@media(max-width:900px){main{margin-left:252px!important;padding:25px 20px 48px!important}.nav{width:228px!important}}
+@media(max-width:680px){main{margin:0!important;padding:18px 14px 40px!important}.nav{position:relative!important;width:auto!important;height:auto!important;bottom:auto!important;left:auto!important;top:auto!important;display:flex!important;flex-direction:column!important;gap:13px!important;margin:18px 0 24px!important;padding:14px!important;border:1px solid var(--border)!important;border-radius:13px!important;box-shadow:none!important}.nav:before{padding-bottom:11px}.nav-group{display:grid!important;grid-template-columns:1fr 1fr!important;gap:5px!important}.nav-group>span{grid-column:1/-1!important}.nav a{min-height:36px!important;padding:8px!important;font-size:12px!important}.panel{padding:16px!important}.details,.meta,.formgrid{grid-template-columns:1fr!important}.stats{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+@media(max-width:390px){.nav-group{grid-template-columns:1fr!important}.nav-group>span{grid-column:1!important}.stats{grid-template-columns:1fr!important}}
+
 </style></head><body><main>
 <h1>🗺️ Rotas de visitas presenciais</h1><p class="muted">Estabelecimentos marcados como “Visita presencial”, organizados por bairro. Clique em um bairro para abrir a lista de locais.</p>
 <nav class="nav" aria-label="Navegação principal">
@@ -866,6 +1007,53 @@ button:focus-visible,.btn:focus-visible,a:focus-visible{outline:2px solid var(--
 @media(max-width:760px){main{width:calc(100% - 24px)!important;padding-top:18px!important}.nav{display:grid!important;grid-template-columns:1fr 1fr!important;padding:8px!important;gap:6px!important}.nav-group{min-width:0!important;padding:6px!important}.nav-group a{width:100%!important}.panel{padding:16px!important}.details,.formgrid{grid-template-columns:1fr!important}}
 @media(max-width:440px){.nav{grid-template-columns:1fr!important}.nav-group{display:grid!important;grid-template-columns:1fr!important}.nav-group>span{grid-column:1/-1}}
 
+
+/* MAPeADOR PRODUCT UI v2 — layout inspirado em CRMs e ferramentas SaaS */
+:root{color-scheme:dark;--app-bg:#080d17;--sidebar:#0b1220;--surface:#101a2b;--surface-2:#131f33;--border:#24334a;--text:#e8eef8;--muted:#8fa1bb;--accent:#6aaeff;--accent-soft:#142d4b;--success:#3bc99a;--radius:14px}
+html{scroll-behavior:smooth}
+body{margin:0!important;background:var(--app-bg)!important;color:var(--text)!important;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;font-size:14px!important;line-height:1.55!important}
+main{width:auto!important;max-width:1440px!important;margin:0 0 0 276px!important;padding:34px clamp(20px,3vw,48px) 64px!important}
+header{margin-bottom:24px}
+.brand{margin-bottom:8px!important;gap:13px!important}
+.mark{width:42px!important;height:42px!important;border-radius:12px!important;background:linear-gradient(145deg,#76baff,#3d78e8)!important;box-shadow:0 8px 24px #347ce833!important;font-size:21px!important}
+h1{font-size:clamp(25px,2vw,32px)!important;line-height:1.2!important;letter-spacing:-.035em!important;font-weight:760!important}
+h2{font-size:17px!important;letter-spacing:-.02em!important;font-weight:720!important;margin-bottom:15px!important}
+h3{font-size:16px!important;font-weight:700!important}
+.sub{color:var(--muted)!important;font-size:14px!important;margin:8px 0 18px!important;max-width:760px}
+.panel,.entry,.lead,.neighborhood,article{background:var(--surface)!important;border:1px solid var(--border)!important;border-radius:var(--radius)!important;box-shadow:0 8px 24px #00000012!important}
+.panel{padding:clamp(18px,2vw,26px)!important;margin:16px 0 20px!important}
+.entry,.lead{padding:19px!important}
+.stat{background:#0c1524!important;border:1px solid var(--border)!important;border-radius:12px!important}
+.stat strong{font-size:26px!important;letter-spacing:-.04em!important}
+label,.muted,.note,.category{color:var(--muted)!important}
+label{font-size:12px!important;font-weight:650!important;letter-spacing:.01em!important}
+input,select,textarea{box-sizing:border-box!important;background:#0a1322!important;color:var(--text)!important;border:1px solid #2a3b54!important;border-radius:9px!important;padding:11px 12px!important;font:inherit!important;min-height:42px!important;transition:border-color .15s,box-shadow .15s}
+input:focus,select:focus,textarea:focus{outline:0!important;border-color:var(--accent)!important;box-shadow:0 0 0 3px #6aaeff20!important}
+button,.btn{display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:8px!important;background:#6aaeff!important;color:#071323!important;border:1px solid #82bbff!important;border-radius:9px!important;padding:10px 15px!important;font-size:13px!important;font-weight:750!important;text-decoration:none!important;box-shadow:none!important;transition:background .15s,border-color .15s,transform .15s}
+button:hover,.btn:hover{background:#8ac2ff!important;transform:translateY(-1px)}
+button:disabled{opacity:.55;cursor:wait}
+a{color:#8fc6ff}
+a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;outline-offset:3px!important}
+.nav{position:fixed!important;z-index:100!important;left:0!important;top:0!important;bottom:0!important;width:252px!important;height:100dvh!important;overflow-y:auto!important;display:flex!important;flex-direction:column!important;align-items:stretch!important;justify-content:flex-start!important;gap:20px!important;margin:0!important;padding:25px 14px 22px!important;background:linear-gradient(180deg,#0c1525,#0a111e)!important;border:0!important;border-right:1px solid #202d42!important;border-radius:0!important;box-shadow:8px 0 28px #00000016!important}
+.nav:before{content:"MAPEADOR  /  WORKSPACE";display:block;padding:0 10px 17px;border-bottom:1px solid #202d42;color:#8297b4;font-size:10px;font-weight:800;letter-spacing:.14em}
+.nav-group{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:4px!important;flex:0 0 auto!important;min-width:0!important;padding:0!important;background:transparent!important;border:0!important;border-radius:0!important}
+.nav-group>span{width:auto!important;padding:0 10px 8px!important;color:#7186a3!important;font-size:10px!important;letter-spacing:.13em!important;font-weight:800!important}
+.nav a{display:flex!important;align-items:center!important;gap:10px!important;width:100%!important;min-height:38px!important;padding:9px 10px!important;background:transparent!important;border:1px solid transparent!important;border-radius:8px!important;color:#aebdd1!important;font-size:13px!important;font-weight:570!important;line-height:1.35!important;white-space:normal!important;text-decoration:none!important;transition:background .14s,color .14s,border-color .14s!important}
+.nav a:hover{background:#142238!important;border-color:#1d304b!important;color:#f0f6ff!important;transform:none!important}
+.nav a[aria-current="page"],.nav a.active{background:#17375b!important;border-color:#244c78!important;color:#fff!important;font-weight:700!important}
+.nav a[aria-current="page"]:before,.nav a.active:before{content:"";width:3px;height:18px;border-radius:5px;background:#6aaeff;position:absolute;left:0}
+.nav a{position:relative!important}
+.nav-group>span{display:block!important}
+.filters{gap:7px!important}
+.filters a,.tabs a{border:1px solid var(--border)!important;border-radius:8px!important;background:#0c1524!important;color:#b8c8dd!important;text-decoration:none!important}
+.filters a.active,.tabs a.active,.active{background:#17375b!important;border-color:#2d5d91!important;color:#fff!important}
+.pill,.score{font-size:11px!important;font-weight:750!important;letter-spacing:.01em}
+.alert{border-radius:10px!important}
+.footer{color:#7186a3!important}
+@media(max-width:900px){main{margin-left:252px!important;padding:25px 20px 48px!important}.nav{width:228px!important}}
+@media(max-width:680px){main{margin:0!important;padding:18px 14px 40px!important}.nav{position:relative!important;width:auto!important;height:auto!important;bottom:auto!important;left:auto!important;top:auto!important;display:flex!important;flex-direction:column!important;gap:13px!important;margin:18px 0 24px!important;padding:14px!important;border:1px solid var(--border)!important;border-radius:13px!important;box-shadow:none!important}.nav:before{padding-bottom:11px}.nav-group{display:grid!important;grid-template-columns:1fr 1fr!important;gap:5px!important}.nav-group>span{grid-column:1/-1!important}.nav a{min-height:36px!important;padding:8px!important;font-size:12px!important}.panel{padding:16px!important}.details,.meta,.formgrid{grid-template-columns:1fr!important}.stats{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+@media(max-width:390px){.nav-group{grid-template-columns:1fr!important}.nav-group>span{grid-column:1!important}.stats{grid-template-columns:1fr!important}}
+
 </style></head><body><main><h1>Central de campanhas</h1><p class="muted">Você cria e revisa a mensagem. A abertura do WhatsApp é manual; nada é enviado automaticamente.</p><nav class="nav" aria-label="Navegação principal">
  <div class="nav-group"><span>PROSPECÇÃO</span><a href="/">＋ Nova prospecção</a><a href="/history">▤ Estabelecimentos</a><a href="/removed">🚫 Removidos</a></div>
  <div class="nav-group"><span>CAMPO</span><a href="/visits">📍 Visitas presenciais</a><a href="/routes">🗺️ Rotas</a></div>
@@ -933,6 +1121,53 @@ button:focus-visible,.btn:focus-visible,a:focus-visible{outline:2px solid var(--
 @media(max-width:760px){main{width:calc(100% - 24px)!important;padding-top:18px!important}.nav{display:grid!important;grid-template-columns:1fr 1fr!important;padding:8px!important;gap:6px!important}.nav-group{min-width:0!important;padding:6px!important}.nav-group a{width:100%!important}.panel{padding:16px!important}.details,.formgrid{grid-template-columns:1fr!important}}
 @media(max-width:440px){.nav{grid-template-columns:1fr!important}.nav-group{display:grid!important;grid-template-columns:1fr!important}.nav-group>span{grid-column:1/-1}}
 
+
+/* MAPeADOR PRODUCT UI v2 — layout inspirado em CRMs e ferramentas SaaS */
+:root{color-scheme:dark;--app-bg:#080d17;--sidebar:#0b1220;--surface:#101a2b;--surface-2:#131f33;--border:#24334a;--text:#e8eef8;--muted:#8fa1bb;--accent:#6aaeff;--accent-soft:#142d4b;--success:#3bc99a;--radius:14px}
+html{scroll-behavior:smooth}
+body{margin:0!important;background:var(--app-bg)!important;color:var(--text)!important;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;font-size:14px!important;line-height:1.55!important}
+main{width:auto!important;max-width:1440px!important;margin:0 0 0 276px!important;padding:34px clamp(20px,3vw,48px) 64px!important}
+header{margin-bottom:24px}
+.brand{margin-bottom:8px!important;gap:13px!important}
+.mark{width:42px!important;height:42px!important;border-radius:12px!important;background:linear-gradient(145deg,#76baff,#3d78e8)!important;box-shadow:0 8px 24px #347ce833!important;font-size:21px!important}
+h1{font-size:clamp(25px,2vw,32px)!important;line-height:1.2!important;letter-spacing:-.035em!important;font-weight:760!important}
+h2{font-size:17px!important;letter-spacing:-.02em!important;font-weight:720!important;margin-bottom:15px!important}
+h3{font-size:16px!important;font-weight:700!important}
+.sub{color:var(--muted)!important;font-size:14px!important;margin:8px 0 18px!important;max-width:760px}
+.panel,.entry,.lead,.neighborhood,article{background:var(--surface)!important;border:1px solid var(--border)!important;border-radius:var(--radius)!important;box-shadow:0 8px 24px #00000012!important}
+.panel{padding:clamp(18px,2vw,26px)!important;margin:16px 0 20px!important}
+.entry,.lead{padding:19px!important}
+.stat{background:#0c1524!important;border:1px solid var(--border)!important;border-radius:12px!important}
+.stat strong{font-size:26px!important;letter-spacing:-.04em!important}
+label,.muted,.note,.category{color:var(--muted)!important}
+label{font-size:12px!important;font-weight:650!important;letter-spacing:.01em!important}
+input,select,textarea{box-sizing:border-box!important;background:#0a1322!important;color:var(--text)!important;border:1px solid #2a3b54!important;border-radius:9px!important;padding:11px 12px!important;font:inherit!important;min-height:42px!important;transition:border-color .15s,box-shadow .15s}
+input:focus,select:focus,textarea:focus{outline:0!important;border-color:var(--accent)!important;box-shadow:0 0 0 3px #6aaeff20!important}
+button,.btn{display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:8px!important;background:#6aaeff!important;color:#071323!important;border:1px solid #82bbff!important;border-radius:9px!important;padding:10px 15px!important;font-size:13px!important;font-weight:750!important;text-decoration:none!important;box-shadow:none!important;transition:background .15s,border-color .15s,transform .15s}
+button:hover,.btn:hover{background:#8ac2ff!important;transform:translateY(-1px)}
+button:disabled{opacity:.55;cursor:wait}
+a{color:#8fc6ff}
+a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;outline-offset:3px!important}
+.nav{position:fixed!important;z-index:100!important;left:0!important;top:0!important;bottom:0!important;width:252px!important;height:100dvh!important;overflow-y:auto!important;display:flex!important;flex-direction:column!important;align-items:stretch!important;justify-content:flex-start!important;gap:20px!important;margin:0!important;padding:25px 14px 22px!important;background:linear-gradient(180deg,#0c1525,#0a111e)!important;border:0!important;border-right:1px solid #202d42!important;border-radius:0!important;box-shadow:8px 0 28px #00000016!important}
+.nav:before{content:"MAPEADOR  /  WORKSPACE";display:block;padding:0 10px 17px;border-bottom:1px solid #202d42;color:#8297b4;font-size:10px;font-weight:800;letter-spacing:.14em}
+.nav-group{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:4px!important;flex:0 0 auto!important;min-width:0!important;padding:0!important;background:transparent!important;border:0!important;border-radius:0!important}
+.nav-group>span{width:auto!important;padding:0 10px 8px!important;color:#7186a3!important;font-size:10px!important;letter-spacing:.13em!important;font-weight:800!important}
+.nav a{display:flex!important;align-items:center!important;gap:10px!important;width:100%!important;min-height:38px!important;padding:9px 10px!important;background:transparent!important;border:1px solid transparent!important;border-radius:8px!important;color:#aebdd1!important;font-size:13px!important;font-weight:570!important;line-height:1.35!important;white-space:normal!important;text-decoration:none!important;transition:background .14s,color .14s,border-color .14s!important}
+.nav a:hover{background:#142238!important;border-color:#1d304b!important;color:#f0f6ff!important;transform:none!important}
+.nav a[aria-current="page"],.nav a.active{background:#17375b!important;border-color:#244c78!important;color:#fff!important;font-weight:700!important}
+.nav a[aria-current="page"]:before,.nav a.active:before{content:"";width:3px;height:18px;border-radius:5px;background:#6aaeff;position:absolute;left:0}
+.nav a{position:relative!important}
+.nav-group>span{display:block!important}
+.filters{gap:7px!important}
+.filters a,.tabs a{border:1px solid var(--border)!important;border-radius:8px!important;background:#0c1524!important;color:#b8c8dd!important;text-decoration:none!important}
+.filters a.active,.tabs a.active,.active{background:#17375b!important;border-color:#2d5d91!important;color:#fff!important}
+.pill,.score{font-size:11px!important;font-weight:750!important;letter-spacing:.01em}
+.alert{border-radius:10px!important}
+.footer{color:#7186a3!important}
+@media(max-width:900px){main{margin-left:252px!important;padding:25px 20px 48px!important}.nav{width:228px!important}}
+@media(max-width:680px){main{margin:0!important;padding:18px 14px 40px!important}.nav{position:relative!important;width:auto!important;height:auto!important;bottom:auto!important;left:auto!important;top:auto!important;display:flex!important;flex-direction:column!important;gap:13px!important;margin:18px 0 24px!important;padding:14px!important;border:1px solid var(--border)!important;border-radius:13px!important;box-shadow:none!important}.nav:before{padding-bottom:11px}.nav-group{display:grid!important;grid-template-columns:1fr 1fr!important;gap:5px!important}.nav-group>span{grid-column:1/-1!important}.nav a{min-height:36px!important;padding:8px!important;font-size:12px!important}.panel{padding:16px!important}.details,.meta,.formgrid{grid-template-columns:1fr!important}.stats{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+@media(max-width:390px){.nav-group{grid-template-columns:1fr!important}.nav-group>span{grid-column:1!important}.stats{grid-template-columns:1fr!important}}
+
 </style></head><body><main><p><a href="/campaigns">← Campanhas</a></p><h1>{{campaign.name}}</h1><p class="muted">{{'4K Food Service' if campaign.profile == '4k' else 'Presença Digital'}} · {{leads|length}} contatos</p><section class="panel"><h2>Mensagem aprovada por você</h2><div class="draft">{{campaign.message}}</div><p class="muted">Para abrir a conversa, marque a confirmação de autorização aplicável e clique em Abrir WhatsApp. Você ainda precisa conferir e enviar dentro do WhatsApp.</p></section>
 {% for lead in leads %}<article class="entry"><h3>{{lead.name}}</h3><p>{{lead.category}} · {{lead.chosen_phone or 'Sem telefone público'}}</p><p class="muted">WhatsApp: {{lead.contact_whatsapp or 'não confirmado'}} · CNPJ: {{lead.cnpj or 'não identificado publicamente'}}</p>
 {% if lead.wa_url %}<a class="btn" href="{{lead.wa_url}}" target="_blank" rel="noopener">Abrir mensagem no WhatsApp</a>{% else %}<p class="muted">Número ausente ou inválido para link do WhatsApp.</p>{% endif %}
@@ -992,6 +1227,53 @@ button:focus-visible,.btn:focus-visible,a:focus-visible{outline:2px solid var(--
 .footer{color:#7589a5!important;padding-top:12px}
 @media(max-width:760px){main{width:calc(100% - 24px)!important;padding-top:18px!important}.nav{display:grid!important;grid-template-columns:1fr 1fr!important;padding:8px!important;gap:6px!important}.nav-group{min-width:0!important;padding:6px!important}.nav-group a{width:100%!important}.panel{padding:16px!important}.details,.formgrid{grid-template-columns:1fr!important}}
 @media(max-width:440px){.nav{grid-template-columns:1fr!important}.nav-group{display:grid!important;grid-template-columns:1fr!important}.nav-group>span{grid-column:1/-1}}
+
+
+/* MAPeADOR PRODUCT UI v2 — layout inspirado em CRMs e ferramentas SaaS */
+:root{color-scheme:dark;--app-bg:#080d17;--sidebar:#0b1220;--surface:#101a2b;--surface-2:#131f33;--border:#24334a;--text:#e8eef8;--muted:#8fa1bb;--accent:#6aaeff;--accent-soft:#142d4b;--success:#3bc99a;--radius:14px}
+html{scroll-behavior:smooth}
+body{margin:0!important;background:var(--app-bg)!important;color:var(--text)!important;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;font-size:14px!important;line-height:1.55!important}
+main{width:auto!important;max-width:1440px!important;margin:0 0 0 276px!important;padding:34px clamp(20px,3vw,48px) 64px!important}
+header{margin-bottom:24px}
+.brand{margin-bottom:8px!important;gap:13px!important}
+.mark{width:42px!important;height:42px!important;border-radius:12px!important;background:linear-gradient(145deg,#76baff,#3d78e8)!important;box-shadow:0 8px 24px #347ce833!important;font-size:21px!important}
+h1{font-size:clamp(25px,2vw,32px)!important;line-height:1.2!important;letter-spacing:-.035em!important;font-weight:760!important}
+h2{font-size:17px!important;letter-spacing:-.02em!important;font-weight:720!important;margin-bottom:15px!important}
+h3{font-size:16px!important;font-weight:700!important}
+.sub{color:var(--muted)!important;font-size:14px!important;margin:8px 0 18px!important;max-width:760px}
+.panel,.entry,.lead,.neighborhood,article{background:var(--surface)!important;border:1px solid var(--border)!important;border-radius:var(--radius)!important;box-shadow:0 8px 24px #00000012!important}
+.panel{padding:clamp(18px,2vw,26px)!important;margin:16px 0 20px!important}
+.entry,.lead{padding:19px!important}
+.stat{background:#0c1524!important;border:1px solid var(--border)!important;border-radius:12px!important}
+.stat strong{font-size:26px!important;letter-spacing:-.04em!important}
+label,.muted,.note,.category{color:var(--muted)!important}
+label{font-size:12px!important;font-weight:650!important;letter-spacing:.01em!important}
+input,select,textarea{box-sizing:border-box!important;background:#0a1322!important;color:var(--text)!important;border:1px solid #2a3b54!important;border-radius:9px!important;padding:11px 12px!important;font:inherit!important;min-height:42px!important;transition:border-color .15s,box-shadow .15s}
+input:focus,select:focus,textarea:focus{outline:0!important;border-color:var(--accent)!important;box-shadow:0 0 0 3px #6aaeff20!important}
+button,.btn{display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:8px!important;background:#6aaeff!important;color:#071323!important;border:1px solid #82bbff!important;border-radius:9px!important;padding:10px 15px!important;font-size:13px!important;font-weight:750!important;text-decoration:none!important;box-shadow:none!important;transition:background .15s,border-color .15s,transform .15s}
+button:hover,.btn:hover{background:#8ac2ff!important;transform:translateY(-1px)}
+button:disabled{opacity:.55;cursor:wait}
+a{color:#8fc6ff}
+a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;outline-offset:3px!important}
+.nav{position:fixed!important;z-index:100!important;left:0!important;top:0!important;bottom:0!important;width:252px!important;height:100dvh!important;overflow-y:auto!important;display:flex!important;flex-direction:column!important;align-items:stretch!important;justify-content:flex-start!important;gap:20px!important;margin:0!important;padding:25px 14px 22px!important;background:linear-gradient(180deg,#0c1525,#0a111e)!important;border:0!important;border-right:1px solid #202d42!important;border-radius:0!important;box-shadow:8px 0 28px #00000016!important}
+.nav:before{content:"MAPEADOR  /  WORKSPACE";display:block;padding:0 10px 17px;border-bottom:1px solid #202d42;color:#8297b4;font-size:10px;font-weight:800;letter-spacing:.14em}
+.nav-group{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:4px!important;flex:0 0 auto!important;min-width:0!important;padding:0!important;background:transparent!important;border:0!important;border-radius:0!important}
+.nav-group>span{width:auto!important;padding:0 10px 8px!important;color:#7186a3!important;font-size:10px!important;letter-spacing:.13em!important;font-weight:800!important}
+.nav a{display:flex!important;align-items:center!important;gap:10px!important;width:100%!important;min-height:38px!important;padding:9px 10px!important;background:transparent!important;border:1px solid transparent!important;border-radius:8px!important;color:#aebdd1!important;font-size:13px!important;font-weight:570!important;line-height:1.35!important;white-space:normal!important;text-decoration:none!important;transition:background .14s,color .14s,border-color .14s!important}
+.nav a:hover{background:#142238!important;border-color:#1d304b!important;color:#f0f6ff!important;transform:none!important}
+.nav a[aria-current="page"],.nav a.active{background:#17375b!important;border-color:#244c78!important;color:#fff!important;font-weight:700!important}
+.nav a[aria-current="page"]:before,.nav a.active:before{content:"";width:3px;height:18px;border-radius:5px;background:#6aaeff;position:absolute;left:0}
+.nav a{position:relative!important}
+.nav-group>span{display:block!important}
+.filters{gap:7px!important}
+.filters a,.tabs a{border:1px solid var(--border)!important;border-radius:8px!important;background:#0c1524!important;color:#b8c8dd!important;text-decoration:none!important}
+.filters a.active,.tabs a.active,.active{background:#17375b!important;border-color:#2d5d91!important;color:#fff!important}
+.pill,.score{font-size:11px!important;font-weight:750!important;letter-spacing:.01em}
+.alert{border-radius:10px!important}
+.footer{color:#7186a3!important}
+@media(max-width:900px){main{margin-left:252px!important;padding:25px 20px 48px!important}.nav{width:228px!important}}
+@media(max-width:680px){main{margin:0!important;padding:18px 14px 40px!important}.nav{position:relative!important;width:auto!important;height:auto!important;bottom:auto!important;left:auto!important;top:auto!important;display:flex!important;flex-direction:column!important;gap:13px!important;margin:18px 0 24px!important;padding:14px!important;border:1px solid var(--border)!important;border-radius:13px!important;box-shadow:none!important}.nav:before{padding-bottom:11px}.nav-group{display:grid!important;grid-template-columns:1fr 1fr!important;gap:5px!important}.nav-group>span{grid-column:1/-1!important}.nav a{min-height:36px!important;padding:8px!important;font-size:12px!important}.panel{padding:16px!important}.details,.meta,.formgrid{grid-template-columns:1fr!important}.stats{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+@media(max-width:390px){.nav-group{grid-template-columns:1fr!important}.nav-group>span{grid-column:1!important}.stats{grid-template-columns:1fr!important}}
 
 </style></head><body><main>
 <h1>Modo automático</h1><p class="muted">O Mapeador pode pesquisar negócios, complementar dados públicos e criar rascunhos separados para cada canal de contato e para cada empresa. O computador e o Mapeador precisam permanecer ligados.</p>
@@ -1065,6 +1347,53 @@ button:focus-visible,.btn:focus-visible,a:focus-visible{outline:2px solid var(--
 .footer{color:#7589a5!important;padding-top:12px}
 @media(max-width:760px){main{width:calc(100% - 24px)!important;padding-top:18px!important}.nav{display:grid!important;grid-template-columns:1fr 1fr!important;padding:8px!important;gap:6px!important}.nav-group{min-width:0!important;padding:6px!important}.nav-group a{width:100%!important}.panel{padding:16px!important}.details,.formgrid{grid-template-columns:1fr!important}}
 @media(max-width:440px){.nav{grid-template-columns:1fr!important}.nav-group{display:grid!important;grid-template-columns:1fr!important}.nav-group>span{grid-column:1/-1}}
+
+
+/* MAPeADOR PRODUCT UI v2 — layout inspirado em CRMs e ferramentas SaaS */
+:root{color-scheme:dark;--app-bg:#080d17;--sidebar:#0b1220;--surface:#101a2b;--surface-2:#131f33;--border:#24334a;--text:#e8eef8;--muted:#8fa1bb;--accent:#6aaeff;--accent-soft:#142d4b;--success:#3bc99a;--radius:14px}
+html{scroll-behavior:smooth}
+body{margin:0!important;background:var(--app-bg)!important;color:var(--text)!important;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;font-size:14px!important;line-height:1.55!important}
+main{width:auto!important;max-width:1440px!important;margin:0 0 0 276px!important;padding:34px clamp(20px,3vw,48px) 64px!important}
+header{margin-bottom:24px}
+.brand{margin-bottom:8px!important;gap:13px!important}
+.mark{width:42px!important;height:42px!important;border-radius:12px!important;background:linear-gradient(145deg,#76baff,#3d78e8)!important;box-shadow:0 8px 24px #347ce833!important;font-size:21px!important}
+h1{font-size:clamp(25px,2vw,32px)!important;line-height:1.2!important;letter-spacing:-.035em!important;font-weight:760!important}
+h2{font-size:17px!important;letter-spacing:-.02em!important;font-weight:720!important;margin-bottom:15px!important}
+h3{font-size:16px!important;font-weight:700!important}
+.sub{color:var(--muted)!important;font-size:14px!important;margin:8px 0 18px!important;max-width:760px}
+.panel,.entry,.lead,.neighborhood,article{background:var(--surface)!important;border:1px solid var(--border)!important;border-radius:var(--radius)!important;box-shadow:0 8px 24px #00000012!important}
+.panel{padding:clamp(18px,2vw,26px)!important;margin:16px 0 20px!important}
+.entry,.lead{padding:19px!important}
+.stat{background:#0c1524!important;border:1px solid var(--border)!important;border-radius:12px!important}
+.stat strong{font-size:26px!important;letter-spacing:-.04em!important}
+label,.muted,.note,.category{color:var(--muted)!important}
+label{font-size:12px!important;font-weight:650!important;letter-spacing:.01em!important}
+input,select,textarea{box-sizing:border-box!important;background:#0a1322!important;color:var(--text)!important;border:1px solid #2a3b54!important;border-radius:9px!important;padding:11px 12px!important;font:inherit!important;min-height:42px!important;transition:border-color .15s,box-shadow .15s}
+input:focus,select:focus,textarea:focus{outline:0!important;border-color:var(--accent)!important;box-shadow:0 0 0 3px #6aaeff20!important}
+button,.btn{display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:8px!important;background:#6aaeff!important;color:#071323!important;border:1px solid #82bbff!important;border-radius:9px!important;padding:10px 15px!important;font-size:13px!important;font-weight:750!important;text-decoration:none!important;box-shadow:none!important;transition:background .15s,border-color .15s,transform .15s}
+button:hover,.btn:hover{background:#8ac2ff!important;transform:translateY(-1px)}
+button:disabled{opacity:.55;cursor:wait}
+a{color:#8fc6ff}
+a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;outline-offset:3px!important}
+.nav{position:fixed!important;z-index:100!important;left:0!important;top:0!important;bottom:0!important;width:252px!important;height:100dvh!important;overflow-y:auto!important;display:flex!important;flex-direction:column!important;align-items:stretch!important;justify-content:flex-start!important;gap:20px!important;margin:0!important;padding:25px 14px 22px!important;background:linear-gradient(180deg,#0c1525,#0a111e)!important;border:0!important;border-right:1px solid #202d42!important;border-radius:0!important;box-shadow:8px 0 28px #00000016!important}
+.nav:before{content:"MAPEADOR  /  WORKSPACE";display:block;padding:0 10px 17px;border-bottom:1px solid #202d42;color:#8297b4;font-size:10px;font-weight:800;letter-spacing:.14em}
+.nav-group{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:4px!important;flex:0 0 auto!important;min-width:0!important;padding:0!important;background:transparent!important;border:0!important;border-radius:0!important}
+.nav-group>span{width:auto!important;padding:0 10px 8px!important;color:#7186a3!important;font-size:10px!important;letter-spacing:.13em!important;font-weight:800!important}
+.nav a{display:flex!important;align-items:center!important;gap:10px!important;width:100%!important;min-height:38px!important;padding:9px 10px!important;background:transparent!important;border:1px solid transparent!important;border-radius:8px!important;color:#aebdd1!important;font-size:13px!important;font-weight:570!important;line-height:1.35!important;white-space:normal!important;text-decoration:none!important;transition:background .14s,color .14s,border-color .14s!important}
+.nav a:hover{background:#142238!important;border-color:#1d304b!important;color:#f0f6ff!important;transform:none!important}
+.nav a[aria-current="page"],.nav a.active{background:#17375b!important;border-color:#244c78!important;color:#fff!important;font-weight:700!important}
+.nav a[aria-current="page"]:before,.nav a.active:before{content:"";width:3px;height:18px;border-radius:5px;background:#6aaeff;position:absolute;left:0}
+.nav a{position:relative!important}
+.nav-group>span{display:block!important}
+.filters{gap:7px!important}
+.filters a,.tabs a{border:1px solid var(--border)!important;border-radius:8px!important;background:#0c1524!important;color:#b8c8dd!important;text-decoration:none!important}
+.filters a.active,.tabs a.active,.active{background:#17375b!important;border-color:#2d5d91!important;color:#fff!important}
+.pill,.score{font-size:11px!important;font-weight:750!important;letter-spacing:.01em}
+.alert{border-radius:10px!important}
+.footer{color:#7186a3!important}
+@media(max-width:900px){main{margin-left:252px!important;padding:25px 20px 48px!important}.nav{width:228px!important}}
+@media(max-width:680px){main{margin:0!important;padding:18px 14px 40px!important}.nav{position:relative!important;width:auto!important;height:auto!important;bottom:auto!important;left:auto!important;top:auto!important;display:flex!important;flex-direction:column!important;gap:13px!important;margin:18px 0 24px!important;padding:14px!important;border:1px solid var(--border)!important;border-radius:13px!important;box-shadow:none!important}.nav:before{padding-bottom:11px}.nav-group{display:grid!important;grid-template-columns:1fr 1fr!important;gap:5px!important}.nav-group>span{grid-column:1/-1!important}.nav a{min-height:36px!important;padding:8px!important;font-size:12px!important}.panel{padding:16px!important}.details,.meta,.formgrid{grid-template-columns:1fr!important}.stats{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+@media(max-width:390px){.nav-group{grid-template-columns:1fr!important}.nav-group>span{grid-column:1!important}.stats{grid-template-columns:1fr!important}}
 
 </style></head><body><main>
 <h1>Propostas geradas automaticamente</h1><nav class="nav" aria-label="Navegação principal">
