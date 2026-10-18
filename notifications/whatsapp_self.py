@@ -14,6 +14,9 @@ from playwright.sync_api import sync_playwright
 _lock = Lock()
 _last_failure_at = 0.0
 _last_failure_message = ""
+_playwright_instance = None
+_context = None
+_page = None
 
 
 def _open_context(playwright):
@@ -27,8 +30,21 @@ def _open_context(playwright):
     )
 
 
+def _get_whatsapp_page():
+    """Abre o navegador uma vez e mantém o perfil/sessão vivos entre envios."""
+    global _playwright_instance, _context, _page
+    if _playwright_instance is None or _context is None or not _context.pages:
+        if _playwright_instance is None:
+            _playwright_instance = sync_playwright().start()
+        _context = _open_context(_playwright_instance)
+        _page = _context.pages[0] if _context.pages else _context.new_page()
+    elif _page is None or _page.is_closed():
+        _page = _context.pages[0] if _context.pages else _context.new_page()
+    return _page
+
+
 def send_to_group(message: str, group_name: str | None = None) -> tuple[bool, str]:
-    """Envia UMA mensagem para o grupo configurado, nunca para os leads."""
+    """Envia UMA mensagem para o grupo configurado, mantendo a sessão do navegador aberta."""
     group = (group_name or os.getenv("WHATSAPP_GROUP_NAME", "Leads")).strip()
     if not message.strip():
         return False, "Mensagem vazia."
@@ -38,84 +54,83 @@ def send_to_group(message: str, group_name: str | None = None) -> tuple[bool, st
         return False, "Configure WHATSAPP_GROUP_NAME no .env."
 
     global _last_failure_at, _last_failure_message
-    if _last_failure_at and time.monotonic() - _last_failure_at < 300:
+    if _last_failure_at and time.monotonic() - _last_failure_at < 60:
         return False, _last_failure_message or "WhatsApp indisponível; aguardando antes de tentar novamente."
 
     with _lock:
         try:
-            with sync_playwright() as playwright:
-                context = _open_context(playwright)
+            page = _get_whatsapp_page()
+            if not page.url.startswith("https://web.whatsapp.com"):
+                page.goto("https://web.whatsapp.com/", wait_until="domcontentloaded", timeout=60000)
+
+            # Mantém a janela aberta; se pedir QR, o usuário pode escanear uma única vez.
+            try:
+                page.locator(
+                    'div[contenteditable="true"], canvas[aria-label*="Scan"], '
+                    'canvas[aria-label*="QR"], [data-testid="qrcode"], '
+                    'text="Use o WhatsApp no seu celular para escanear o código QR"'
+                ).first.wait_for(timeout=45000)
+            except Exception:
                 try:
-                    page = context.pages[0] if context.pages else context.new_page()
-                    page.goto("https://web.whatsapp.com/", wait_until="domcontentloaded", timeout=60000)
-                    # Aguarda o aplicativo carregar e identifica se a sessão pede QR/login.
-                    try:
-                        page.locator(
-                            'div[contenteditable="true"], canvas[aria-label*="Scan"], '
-                            'canvas[aria-label*="QR"], [data-testid="qrcode"], '
-                            'text="Use o WhatsApp no seu celular para escanear o código QR"'
-                        ).first.wait_for(timeout=45000)
-                    except Exception:
-                        page.screenshot(path="data/whatsapp_load_error.png", full_page=True)
-                        _last_failure_at = time.monotonic()
-                        _last_failure_message = (
-                            "WhatsApp Web não carregou a tela de conversa nem o QR Code em 45 segundos. "
-                            "Veja data/whatsapp_load_error.png e abra https://web.whatsapp.com/ no navegador."
-                        )
-                        return False, _last_failure_message
+                    Path("data").mkdir(parents=True, exist_ok=True)
+                    page.screenshot(path="data/whatsapp_load_error.png", full_page=True)
+                except Exception:
+                    pass
+                _last_failure_at = time.monotonic()
+                _last_failure_message = (
+                    "WhatsApp Web não carregou em 45 segundos. A janela foi mantida aberta; "
+                    "confira a janela do navegador e data/whatsapp_load_error.png."
+                )
+                return False, _last_failure_message
 
-                    editable = page.locator('div[contenteditable="true"]')
-                    if editable.count() == 0:
-                        _last_failure_at = time.monotonic()
-                        _last_failure_message = (
-                            "WhatsApp Web está pedindo autenticação. Escaneie o QR Code na janela do navegador "
-                            "que abriu para o Mapeador e tente novamente."
-                        )
-                        return False, _last_failure_message
+            editable = page.locator('div[contenteditable="true"]')
+            if editable.count() == 0:
+                _last_failure_at = time.monotonic()
+                _last_failure_message = (
+                    "WhatsApp Web está pedindo autenticação. Escaneie o QR Code na janela do navegador; "
+                    "ela ficará aberta para manter a sessão."
+                )
+                return False, _last_failure_message
 
-                    search = page.locator(
-                        'div[contenteditable="true"][data-tab="3"], '
-                        'div[contenteditable="true"][aria-label*="Pesquisar"], '
-                        'div[contenteditable="true"][aria-label*="Search"]'
-                    ).first
-                    search.click(timeout=15000)
-                    search.fill(group)
-                    page.wait_for_timeout(1200)
+            search = page.locator(
+                'div[contenteditable="true"][data-tab="3"], '
+                'div[contenteditable="true"][aria-label*="Pesquisar"], '
+                'div[contenteditable="true"][aria-label*="Search"]'
+            ).first
+            search.click(timeout=15000)
+            search.fill(group)
+            page.wait_for_timeout(1200)
 
-                    # Clique apenas no resultado com o nome exato do grupo.
-                    exact_results = page.get_by_text(group, exact=True)
-                    if exact_results.count() == 0:
-                        _last_failure_at = time.monotonic()
-                        _last_failure_message = f"Não encontrei um chat com o nome exato '{group}'."
-                        return False, _last_failure_message
-                    exact_results.last.click(timeout=15000)
-                    page.wait_for_timeout(800)
+            exact_results = page.get_by_text(group, exact=True)
+            if exact_results.count() == 0:
+                _last_failure_at = time.monotonic()
+                _last_failure_message = f"Não encontrei um chat com o nome exato '{group}'."
+                return False, _last_failure_message
+            exact_results.last.click(timeout=15000)
+            page.wait_for_timeout(800)
 
-                    # Confirma que o chat selecionado tem o título esperado, para não enviar ao chat errado.
-                    title = page.locator('header span[title]').all()
-                    title_values = []
-                    for item in title:
-                        try:
-                            value = item.get_attribute("title")
-                            if value:
-                                title_values.append(value.strip())
-                        except Exception:
-                            pass
-                    if group.casefold() not in {value.casefold() for value in title_values}:
-                        _last_failure_at = time.monotonic()
-                        _last_failure_message = f"Não consegui confirmar que o chat aberto é '{group}'. Nada foi enviado."
-                        return False, _last_failure_message
+            title = page.locator('header span[title]').all()
+            title_values = []
+            for item in title:
+                try:
+                    value = item.get_attribute("title")
+                    if value:
+                        title_values.append(value.strip())
+                except Exception:
+                    pass
+            if group.casefold() not in {value.casefold() for value in title_values}:
+                _last_failure_at = time.monotonic()
+                _last_failure_message = f"Não consegui confirmar que o chat aberto é '{group}'. Nada foi enviado."
+                return False, _last_failure_message
 
-                    composer = page.locator('footer div[contenteditable="true"]').last
-                    composer.wait_for(timeout=15000)
-                    composer.fill(message[:10000])
-                    composer.press("Enter")
-                    page.wait_for_timeout(1000)
-                    _last_failure_at = 0.0
-                    _last_failure_message = ""
-                    return True, f"Mensagem enviada ao grupo '{group}'."
-                finally:
-                    context.close()
+            composer = page.locator('footer div[contenteditable="true"]').last
+            composer.wait_for(timeout=15000)
+            composer.fill(message[:10000])
+            composer.press("Enter")
+            page.wait_for_timeout(1000)
+            _last_failure_at = 0.0
+            _last_failure_message = ""
+            return True, f"Mensagem enviada ao grupo '{group}'."
         except Exception as exc:
             logging.warning("Falha ao enviar notificação para grupo WhatsApp: %s", exc)
             _last_failure_at = time.monotonic()
