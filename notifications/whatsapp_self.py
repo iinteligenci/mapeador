@@ -310,28 +310,47 @@ def _send_to_group_impl(message: str, group_name: str | None = None) -> tuple[bo
                 logging.warning("Mapeador WhatsApp: %s", _last_failure_message)
                 return False, _last_failure_message
 
+            # Registra o total de mensagens enviadas antes de digitar para verificar
+            # se o WhatsApp realmente acrescentou uma nova mensagem à conversa.
+            def outgoing_count() -> int:
+                selectors = [
+                    '#main [data-testid="msg-container"]',
+                    '#main .message-out',
+                    '#main [data-testid="msg-container"] .message-out',
+                ]
+                for selector in selectors:
+                    try:
+                        count = page.locator(selector).count()
+                        if count:
+                            return count
+                    except Exception:
+                        continue
+                return 0
+
+            before_count = outgoing_count()
             composer.click(timeout=8000)
             composer.fill(message[:10000], timeout=10000)
             composer.press("Enter", timeout=8000)
-            page.wait_for_timeout(1200)
+            page.wait_for_timeout(1800)
 
-            # Se o campo ainda contém texto, não declare sucesso falso.
             try:
                 remaining = composer.inner_text(timeout=2000).strip()
             except Exception:
                 remaining = ""
-            if remaining:
+            after_count = outgoing_count()
+            if remaining or (before_count > 0 and after_count <= before_count):
                 _last_failure_at = time.monotonic()
                 _last_failure_message = (
-                    "O WhatsApp não limpou o campo depois de pressionar Enter; "
-                    "não consegui confirmar o envio. Confira a conversa antes de tentar novamente."
+                    f"Não consegui confirmar uma nova mensagem enviada ao grupo '{group}'. "
+                    "O teste anterior não deve ser considerado confirmação de entrega; confira a conversa aberta."
                 )
-                logging.warning("Mapeador WhatsApp: %s", _last_failure_message)
+                logging.warning("Mapeador WhatsApp: %s (mensagens antes=%s, depois=%s, campo_restante=%s)",
+                                _last_failure_message, before_count, after_count, bool(remaining))
                 return False, _last_failure_message
 
             _last_failure_at = 0.0
             _last_failure_message = ""
-            return True, f"Mensagem enviada ao grupo '{group}' (campo de envio confirmado)."
+            return True, f"Envio processado no grupo '{group}'; confira a mensagem na conversa para confirmar a entrega."
         except Exception as exc:
             logging.exception("Falha ao enviar notificação para grupo WhatsApp")
             _last_failure_at = time.monotonic()
