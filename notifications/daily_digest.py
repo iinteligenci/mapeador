@@ -317,6 +317,27 @@ def _is_4k_competitor(lead: dict) -> bool:
     )
     return any(marker in text for marker in markers)
 
+
+def _is_4k_target(lead: dict) -> bool:
+    """Somente operações de alimentação que podem comprar insumos para revenda/preparo pela 4K."""
+    import unicodedata
+    text = unicodedata.normalize(
+        "NFKD", f"{lead.get('lead_name', lead.get('name', ''))} {lead.get('category', '')}"
+    ).encode("ascii", "ignore").decode("ascii").casefold()
+    text = re.sub(r"\s+", " ", text).strip()
+    if _is_distributor(lead) or _is_4k_competitor(lead):
+        return False
+    allowed = (
+        "restaurante", "restaurant", "bar ", "bar e", "bar&", "boteco", "pub",
+        "petiscaria", "petiscos", "gastrobar", "gastropub", "churrascaria",
+        "self service", "self-service", "buffet", "lanchonete", "hamburgueria",
+        "pizzaria", "cantina", "bistro", "bistrô", "cozinha profissional",
+        "cozinha industrial", "casa de massas", "rotisseria", "marmitaria",
+        "food truck", "cervejaria", "casa de eventos", "catering"
+    )
+    return any(term in text for term in allowed)
+
+
 def _is_distributor(lead: dict) -> bool:
     """Mantém distribuidoras fora das notificações de prospecção e rotas de clientes."""
     import unicodedata
@@ -460,7 +481,7 @@ def _ensure_proposals(limit: int = 15) -> None:
                 logging.info("Contatos públicos indisponíveis para %s: %s", lead.get("name"), contact_exc)
         if not _eligible_lead(lead):
             continue
-        eligible_profiles = ("digital",) if _is_4k_competitor(lead) else ("4k", "digital")
+        eligible_profiles = ("4k", "digital") if _is_4k_target(lead) else ("digital",)
         missing = [profile for profile in eligible_profiles if (int(lead["id"]), profile) not in existing]
         if not missing:
             continue
@@ -493,7 +514,7 @@ def _send_proposals(profile: str, today: str, daily_limit: int = 5) -> tuple[int
         lead_id = int(proposal.get("lead_id") or 0)
         if not lead_id or lead_id in unique or _is_distributor(proposal):
             continue
-        if profile == "4k" and _is_4k_competitor(proposal):
+        if profile == "4k" and not _is_4k_target(proposal):
             continue
         if _emails(proposal.get("contact_emails")) and _whatsapp(proposal):
             unique[lead_id] = proposal
