@@ -29,7 +29,7 @@ def _open_context(playwright):
 
 def send_to_group(message: str, group_name: str | None = None) -> tuple[bool, str]:
     """Envia UMA mensagem para o grupo configurado, nunca para os leads."""
-    group = (group_name or os.getenv("WHATSAPP_GROUP_NAME", "lembrar")).strip()
+    group = (group_name or os.getenv("WHATSAPP_GROUP_NAME", "Leads")).strip()
     if not message.strip():
         return False, "Mensagem vazia."
     if os.getenv("WHATSAPP_NOTIFICATIONS", "false").strip().lower() not in {"1", "true", "yes", "sim"}:
