@@ -1492,6 +1492,8 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
  <div class="nav-group"><span>AUTOMAÇÃO</span><a href="/automatic">⚙ Modo automático</a></div>
 </nav>
 <section class="panel"><h2>Envios pelo WhatsApp</h2>
+{% if message %}<div class="alert {{ 'success' if message.startswith('OK:') else '' }}">{{ message }}</div>{% endif %}
+<form method="post" action="/notifications/test"><p class="muted">Teste técnico: envia uma única mensagem de teste para o grupo configurado no WhatsApp Web.</p><button type="submit">Testar envio para o WhatsApp agora</button></form><hr style="border-color:var(--line);margin:20px 0">
 <p class="muted">Escolha quantas vezes por dia quer receber as novidades. Depois, defina o horário de cada envio.</p>
 <form method="post" action="/notifications/schedule" id="notificationScheduleForm">
 <label style="display:flex;align-items:center;gap:10px;margin:10px 0 16px"><input type="checkbox" name="enabled" value="yes" style="width:auto;min-height:0;margin:0" {% if notification_schedule.enabled %}checked{% endif %}> Ativar envios automáticos</label>
@@ -1695,7 +1697,7 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
 @app.get("/automatic")
 def automatic_mode():
     settings = get_automation_settings(os.getenv("DATABASE_PATH", "data/mapeador.sqlite3"))
-    return render_template_string(AUTO_PAGE, settings=settings, notification_schedule=get_notification_schedule())
+    return render_template_string(AUTO_PAGE, settings=settings, notification_schedule=get_notification_schedule(), message=request.args.get("message", ""))
 
 
 @app.post("/automatic/toggle")
@@ -1742,6 +1744,21 @@ def _persist_whatsapp_notifications(enabled: bool) -> None:
         lines.append(f"WHATSAPP_NOTIFICATIONS={value}")
     with open(env_path, "w", encoding="utf-8", newline="\n") as handle:
         handle.write("\n".join(lines).rstrip() + "\n")
+
+
+@app.post("/notifications/test")
+def test_whatsapp_notification():
+    """Envia uma mensagem de teste sob demanda e mostra o resultado real."""
+    from datetime import datetime
+    stamp = datetime.now().astimezone().strftime("%d/%m/%Y %H:%M:%S")
+    test_message = (
+        "TESTE DO MAPEADOR — WhatsApp\n"
+        f"Horário: {stamp}\n"
+        "Se você recebeu esta mensagem no grupo Leads, o envio está funcionando."
+    )
+    ok, detail = send_to_self(test_message)
+    prefix = "OK: " if ok else "ERRO: "
+    return redirect(url_for("automatic_mode", message=prefix + detail))
 
 
 @app.post("/notifications/schedule")
