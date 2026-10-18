@@ -657,7 +657,7 @@ def routes():
     groups_by_name = {}
     for lead in leads:
         neighborhood = _neighborhood(lead)
-        key = re.sub(r"\\s+", " ", neighborhood).strip().casefold()
+        key = re.sub(r"\s+", " ", neighborhood).strip().casefold()
         groups_by_name.setdefault(key, {"name": neighborhood, "leads": []})["leads"].append(lead)
     groups = [{"name": group["name"], "leads": sorted(group["leads"], key=lambda lead: (lead.get("name") or "").casefold())}
               for group in sorted(groups_by_name.values(), key=lambda item: item["name"].casefold())]
