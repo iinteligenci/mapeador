@@ -301,6 +301,22 @@ def _neighborhood(lead: dict) -> str:
         return "Bairro não identificado" + (f" — {city}" if city else "")
     return f"{neighborhood} — {city}" if city else neighborhood
 
+
+def _is_4k_competitor(lead: dict) -> bool:
+    """Varejistas alimentícios concorrentes: podem receber proposta digital, não oferta de revenda 4K."""
+    import unicodedata
+    text = unicodedata.normalize(
+        "NFKD", f"{lead.get('lead_name', lead.get('name', ''))} {lead.get('category', '')}"
+    ).encode("ascii", "ignore").decode("ascii").casefold()
+    text = re.sub(r"\\s+", " ", text).strip()
+    markers = (
+        "acougue", "casa de carnes", "casa das carnes", "boutique de carnes",
+        "aviario", "casa de aves", "casa de frango", "aves e ovos", "casa de ovos",
+        "peixaria", "pescados", "mercado", "supermercado", "mercearia",
+        "hortifruti", "hortifrut", "sacolao", "emporio", "casa de frios",
+    )
+    return any(marker in text for marker in markers)
+
 def _is_distributor(lead: dict) -> bool:
     """Mantém distribuidoras fora das notificações de prospecção e rotas de clientes."""
     import unicodedata
@@ -444,7 +460,8 @@ def _ensure_proposals(limit: int = 15) -> None:
                 logging.info("Contatos públicos indisponíveis para %s: %s", lead.get("name"), contact_exc)
         if not _eligible_lead(lead):
             continue
-        missing = [profile for profile in ("4k", "digital") if (int(lead["id"]), profile) not in existing]
+        eligible_profiles = ("digital",) if _is_4k_competitor(lead) else ("4k", "digital")
+        missing = [profile for profile in eligible_profiles if (int(lead["id"]), profile) not in existing]
         if not missing:
             continue
         analysis_lead = {
@@ -475,6 +492,8 @@ def _send_proposals(profile: str, today: str, daily_limit: int = 5) -> tuple[int
     for proposal in proposals:
         lead_id = int(proposal.get("lead_id") or 0)
         if not lead_id or lead_id in unique or _is_distributor(proposal):
+            continue
+        if profile == "4k" and _is_4k_competitor(proposal):
             continue
         if _emails(proposal.get("contact_emails")) and _whatsapp(proposal):
             unique[lead_id] = proposal
