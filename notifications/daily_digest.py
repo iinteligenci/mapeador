@@ -143,7 +143,7 @@ def _neighborhood(lead: dict) -> str:
         ("Praia das Gaivotas", ("praia das gaivotas", "gaivotas")),
         ("Nossa Senhora da Penha", ("nossa sra. da penha", "nossa sra da penha", "nossa senhora da penha")),
         ("Divino Espirito Santo", ("divino espirito santo",)),
-        ("Centro de Vila Velha", ("centro de vila velha",)),
+        ("Centro", ("centro de vila velha",)),
         ("Morada de Laranjeiras", ("morada de laranjeiras",)),
         ("Jardim da Penha", ("jardim da penha",)),
         ("Jardim Camburi", ("jardim camburi",)),
