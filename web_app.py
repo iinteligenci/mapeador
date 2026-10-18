@@ -25,6 +25,31 @@ from notifications.whatsapp_self import send_to_self
 from notifications.daily_digest import daily_notifications_loop, send_eligible_routes_now, _neighborhood, get_notification_schedule, set_notification_schedule
 
 load_dotenv()
+
+
+def _set_local_env_value(key: str, value: str) -> None:
+    """Atualiza a variável no processo e no .env local, preservando as demais configurações."""
+    os.environ[key] = value
+    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+    try:
+        with open(env_path, "r", encoding="utf-8") as handle:
+            lines = handle.read().splitlines()
+    except FileNotFoundError:
+        lines = []
+    prefix = key + "="
+    for index, line in enumerate(lines):
+        if line.strip().startswith(prefix):
+            lines[index] = prefix + value
+            break
+    else:
+        lines.append(prefix + value)
+    with open(env_path, "w", encoding="utf-8", newline="\\n") as handle:
+        handle.write("\\n".join(lines).rstrip() + "\\n")
+
+
+# Grupo definido pelo usuário para receber rotas e propostas.
+_set_local_env_value("WHATSAPP_GROUP_NAME", "Leads")
+
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 1 * 1024 * 1024
 
