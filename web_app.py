@@ -22,7 +22,7 @@ from scraper.maps_scraper import search_google_maps, fetch_place_address
 from scraper.public_contacts import find_public_business_contacts
 from scraper.site_research import research_public_site
 from notifications.whatsapp_self import send_to_self
-from notifications.daily_digest import daily_notifications_loop
+from notifications.daily_digest import daily_notifications_loop, send_eligible_routes_now
 
 load_dotenv()
 app = Flask(__name__)
@@ -710,10 +710,7 @@ def routes():
 
 @app.post("/routes/notify")
 def notify_routes_to_self():
-    message = (request.form.get("message") or "").strip()
-    if not message:
-        return "Não há rotas para enviar.", 400
-    ok, detail = send_to_self("📍 " + message[:3500])
+    ok, detail = send_eligible_routes_now()
     return redirect(url_for("routes", message=("WhatsApp: " + detail)))
 
 
