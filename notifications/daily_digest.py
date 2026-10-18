@@ -1,0 +1,283 @@
+"""Rotina diária de notificações para o grupo WhatsApp privado 'lembrar'."""
+from __future__ import annotations
+
+import logging
+import os
+import re
+import sqlite3
+import time
+from datetime import datetime
+from pathlib import Path
+from urllib.parse import quote
+
+from ai_agent.analyzer import analyze_lead_profiles
+from database.db import get_leads, get_proposals, init_db, save_proposal
+from notifications.whatsapp_self import send_to_group
+
+
+def _db_path() -> str:
+    return os.getenv("DATABASE_PATH", "data/mapeador.sqlite3")
+
+
+def _connect() -> sqlite3.Connection:
+    path = Path(_db_path()).expanduser()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(path), timeout=20)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def _init_log() -> None:
+    init_db(_db_path())
+    with _connect() as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS notification_log (
+                event_key TEXT PRIMARY KEY,
+                category TEXT NOT NULL,
+                label TEXT NOT NULL DEFAULT '',
+                sent_date TEXT NOT NULL,
+                sent_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS notification_daily_runs (
+                run_date TEXT PRIMARY KEY,
+                completed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+
+def _was_sent(event_key: str) -> bool:
+    with _connect() as conn:
+        return conn.execute("SELECT 1 FROM notification_log WHERE event_key=?", (event_key,)).fetchone() is not None
+
+
+def _mark_sent(event_key: str, category: str, label: str, today: str) -> None:
+    with _connect() as conn:
+        conn.execute(
+            "INSERT OR IGNORE INTO notification_log(event_key, category, label, sent_date) VALUES (?, ?, ?, ?)",
+            (event_key, category, label, today),
+        )
+
+
+def _daily_complete(today: str) -> bool:
+    with _connect() as conn:
+        return conn.execute("SELECT 1 FROM notification_daily_runs WHERE run_date=?", (today,)).fetchone() is not None
+
+
+def _mark_daily_complete(today: str) -> None:
+    with _connect() as conn:
+        conn.execute("INSERT OR IGNORE INTO notification_daily_runs(run_date) VALUES (?)", (today,))
+
+
+def _emails(value: object) -> list[str]:
+    raw = str(value or "")
+    return list(dict.fromkeys(
+        item.strip() for item in re.split(r"[,;\s]+", raw)
+        if "@" in item and "." in item.rsplit("@", 1)[-1]
+    ))
+
+
+def _whatsapp(lead: dict) -> str:
+    raw = str(lead.get("contact_whatsapp") or lead.get("contact_whatsapps") or "").strip()
+    # If multiple numbers were found, use the first one.
+    raw = re.split(r"[,;\n]+", raw)[0].strip()
+    digits = re.sub(r"\D", "", raw)
+    if len(digits) in (10, 11):
+        digits = "55" + digits
+    return "+" + digits if 12 <= len(digits) <= 13 else ""
+
+
+def _neighborhood(lead: dict) -> str:
+    address = re.sub(r"\s+", " ", str(lead.get("address") or "")).strip()
+    low = address.casefold()
+    aliases = [
+        ("Praia da Costa", ("praia da costa",)),
+        ("Itapuã", ("itapuã", "itapua")),
+        ("Praia de Itaparica", ("praia de itaparica",)),
+        ("Coqueiral de Itaparica", ("coqueiral de itaparica", "coqueiral")),
+        ("Praia das Gaivotas", ("praia das gaivotas", "gaivotas")),
+        ("Ataíde", ("ataíde", "ataide")),
+        ("Nossa Senhora da Penha", ("nossa sra. da penha", "nossa sra da penha", "nossa senhora da penha")),
+        ("Centro de Vila Velha", ("centro de vila velha",)),
+        ("Divino Espírito Santo", ("divino espírito santo", "divino espirito santo")),
+        ("Glória", ("glória", "gloria")),
+        ("Soteco", ("soteco",)),
+    ]
+    for canonical, needles in aliases:
+        if any(needle in low for needle in needles):
+            return canonical
+    parts = [part.strip() for part in address.split(",") if part.strip()]
+    if len(parts) >= 3:
+        candidate = re.sub(r"^[\s\-–,:]+", "", parts[-3]).strip()
+        candidate = re.sub(r"^(?:(?:loja|lj|quiosque|box|sala)\s*)?\d+\s*[-–:]\s*", "", candidate, flags=re.I).strip()
+        if candidate.casefold() not in {"brasil", "brazil", "espírito santo", "es", "vila velha"}:
+            return candidate
+    return "Bairro não identificado"
+
+
+def _send_routes(today: str) -> bool:
+    leads = [item for item in get_leads(path=_db_path()) if item.get("status") == "in_person"]
+    groups: dict[str, list[dict]] = {}
+    for lead in leads:
+        name = _neighborhood(lead)
+        groups.setdefault(name, []).append(lead)
+    all_ok = True
+    for neighborhood, places in sorted(groups.items(), key=lambda item: item[0].casefold()):
+        if len(places) <= 10:
+            continue
+        event_key = "route:" + neighborhood.casefold()
+        if _was_sent(event_key):
+            continue
+        lines = [
+            f"🗺️ ROTA DE VISITAS — {neighborhood.upper()}",
+            f"Visitas presenciais cadastradas neste bairro: {len(places)}",
+            "Mensagem de rota do Mapeador; não é proposta comercial.",
+            "",
+        ]
+        for place in sorted(places, key=lambda item: str(item.get("name") or "").casefold()):
+            address = str(place.get("address") or "Endereço não identificado")
+            maps_url = str(place.get("link") or (
+                "https://www.google.com/maps/search/?api=1&query=" +
+                quote(str(place.get("name") or "") + " " + address)
+            ))
+            lines.extend([f"• {place.get('name') or 'Estabelecimento'}", f"  Endereço: {address}", f"  Google Maps: {maps_url}", ""])
+        ok, detail = send_to_group("\n".join(lines)[:3500])
+        if ok:
+            _mark_sent(event_key, "route", neighborhood, today)
+        else:
+            all_ok = False
+            logging.warning("Rota do bairro %s não enviada: %s", neighborhood, detail)
+    return all_ok
+
+
+def _eligible_lead(lead: dict) -> bool:
+    return bool(_emails(lead.get("contact_emails")) and _whatsapp(lead))
+
+
+def _ensure_proposals(limit: int = 15) -> None:
+    """Gera propostas separadas para leads que já têm e-mail e WhatsApp públicos."""
+    leads = get_leads(path=_db_path())
+    proposals = get_proposals(path=_db_path())
+    existing = {(int(p.get("lead_id") or 0), str(p.get("profile") or "")) for p in proposals}
+    processed = 0
+    for lead in leads:
+        if processed >= limit:
+            break
+        if lead.get("status") in {"removed", "in_person"} or not _eligible_lead(lead):
+            continue
+        missing = [profile for profile in ("4k", "digital") if (int(lead["id"]), profile) not in existing]
+        if not missing:
+            continue
+        analysis_lead = {
+            **lead,
+            "address": lead.get("address", ""),
+            "contact_whatsapp": _whatsapp(lead),
+            "contact_emails": _emails(lead.get("contact_emails")),
+        }
+        try:
+            analyses = analyze_lead_profiles(analysis_lead, missing)
+            for profile in missing:
+                if profile in analyses:
+                    save_proposal(
+                        int(lead["id"]), profile, "WhatsApp", _whatsapp(lead),
+                        str(lead.get("contact_source") or lead.get("link") or ""),
+                        analyses[profile], _db_path()
+                    )
+            processed += 1
+        except Exception as exc:
+            logging.warning("Não foi possível preparar proposta para %s: %s", lead.get("name"), exc)
+
+
+def _send_proposals(profile: str, today: str, daily_limit: int = 5) -> tuple[int, bool]:
+    label = "4K FOOD SERVICE" if profile == "4k" else "PRESENÇA DIGITAL"
+    proposals = get_proposals(profile=profile, path=_db_path())
+    # Only one proposal per establishment/profile; require a public email and a WhatsApp number.
+    unique: dict[int, dict] = {}
+    for proposal in proposals:
+        lead_id = int(proposal.get("lead_id") or 0)
+        if not lead_id or lead_id in unique:
+            continue
+        if _emails(proposal.get("contact_emails")) and _whatsapp(proposal):
+            unique[lead_id] = proposal
+    sent_today = 0
+    all_ok = True
+    for lead_id, proposal in sorted(unique.items(), key=lambda item: (-int(item[1].get("score") or 0), item[0])):
+        if sent_today >= daily_limit:
+            break
+        event_key = f"proposal:{profile}:{lead_id}"
+        if _was_sent(event_key):
+            continue
+        email = _emails(proposal.get("contact_emails"))[0]
+        whatsapp = _whatsapp(proposal)
+        maps_url = str(proposal.get("maps_url") or "")
+        if not maps_url:
+            address = str(proposal.get("address") or "")
+            maps_url = "https://www.google.com/maps/search/?api=1&query=" + quote(str(proposal.get("lead_name") or "") + " " + address)
+        message = "\n".join([
+            f"📨 PROPOSTA — {label}",
+            f"Empresa: {proposal.get('lead_name') or 'Nome não identificado'}",
+            f"Categoria: {proposal.get('category') or 'Não identificada'}",
+            f"E-mail público: {email}",
+            f"WhatsApp público: {whatsapp}",
+            f"Endereço: {proposal.get('address') or 'Não identificado'}",
+            f"Google Maps: {maps_url}",
+            f"Prioridade preliminar: {proposal.get('score', 0)}/100",
+            f"Justificativa: {proposal.get('justification') or 'Não informada'}",
+            "",
+            "MENSAGEM SUGERIDA (rascunho; não enviada à empresa):",
+            str(proposal.get("message") or ""),
+            "",
+            "Esta é uma proposta de prospecção para revisão. Não é uma rota de visitas.",
+        ])
+        ok, detail = send_to_group(message[:3500])
+        if ok:
+            _mark_sent(event_key, "proposal_" + profile, str(proposal.get("lead_name") or lead_id), today)
+            sent_today += 1
+        else:
+            all_ok = False
+            logging.warning("Proposta %s para %s não enviada: %s", label, proposal.get("lead_name"), detail)
+    return sent_today, all_ok
+
+
+def run_daily_notifications() -> tuple[bool, str]:
+    """Executa rotas primeiro e depois 5 propostas de cada perfil, sempre em mensagens separadas."""
+    _init_log()
+    today = datetime.now().astimezone().date().isoformat()
+    if _daily_complete(today):
+        return True, "Rotina diária já concluída."
+    ok = _send_routes(today)
+    _ensure_proposals(limit=15)
+    count_4k, ok_4k = _send_proposals("4k", today, 5)
+    count_digital, ok_digital = _send_proposals("digital", today, 5)
+    ok = ok and ok_4k and ok_digital
+    # Mark the date complete only when every attempted send succeeded.
+    # Successful individual messages are independently logged, so retries won't duplicate them.
+    if ok:
+        _mark_daily_complete(today)
+    return ok, f"Rotina {today}: {count_4k}/5 propostas 4K e {count_digital}/5 propostas de presença digital enviadas. Rotas elegíveis verificadas."
+
+
+def daily_notifications_loop() -> None:
+    """Executa uma vez por dia após o horário configurado (padrão 09:00, horário local)."""
+    _init_log()
+    while True:
+        try:
+            now = datetime.now().astimezone()
+            today = now.date().isoformat()
+            target = os.getenv("WHATSAPP_DAILY_TIME", "09:00").strip()
+            try:
+                hour, minute = (int(part) for part in target.split(":", 1))
+                due = (now.hour, now.minute) >= (hour, minute)
+            except Exception:
+                due = (now.hour, now.minute) >= (9, 0)
+            if due and not _daily_complete(today):
+                ok, detail = run_daily_notifications()
+                logging.info("Mapeador — notificações diárias: %s", detail)
+                if not ok:
+                    logging.warning("Algumas notificações falharam; o worker tentará novamente em 15 minutos.")
+                    time.sleep(900)
+                    continue
+        except Exception as exc:
+            logging.warning("Erro na rotina diária de notificações: %s", exc)
+        time.sleep(30)
