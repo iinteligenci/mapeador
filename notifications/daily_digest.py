@@ -454,11 +454,12 @@ def _send_routes(today: str) -> bool:
 
 
 def _eligible_lead(lead: dict) -> bool:
-    return bool(_emails(lead.get("contact_emails")) and _whatsapp(lead))
+    """WhatsApp público é obrigatório; e-mail é opcional."""
+    return bool(_whatsapp(lead))
 
 
 def _ensure_proposals(limit: int = 15) -> None:
-    """Gera propostas separadas para leads que já têm e-mail e WhatsApp públicos."""
+    """Gera propostas para leads com WhatsApp público; e-mail é opcional."""
     leads = get_leads(path=_db_path())
     proposals = get_proposals(path=_db_path())
     existing = {(int(p.get("lead_id") or 0), str(p.get("profile") or "")) for p in proposals}
@@ -507,7 +508,7 @@ def _ensure_proposals(limit: int = 15) -> None:
 def _send_proposals(profile: str, today: str, daily_limit: int = 5) -> tuple[int, bool]:
     label = "4K FOOD SERVICE" if profile == "4k" else "PRESENÇA DIGITAL"
     proposals = get_proposals(profile=profile, path=_db_path())
-    # Only one proposal per establishment/profile; require a public email and a WhatsApp number.
+    # Only one proposal per establishment/profile; public WhatsApp is required, email is optional.
     unique: dict[int, dict] = {}
     for proposal in proposals:
         lead_id = int(proposal.get("lead_id") or 0)
@@ -515,7 +516,7 @@ def _send_proposals(profile: str, today: str, daily_limit: int = 5) -> tuple[int
             continue
         if profile == "4k" and not _is_4k_target(proposal):
             continue
-        if _emails(proposal.get("contact_emails")) and _whatsapp(proposal):
+        if _whatsapp(proposal):
             unique[lead_id] = proposal
     unsent = [
         (lead_id, proposal)
@@ -530,7 +531,8 @@ def _send_proposals(profile: str, today: str, daily_limit: int = 5) -> tuple[int
     all_ok = True
     for lead_id, proposal in unsent[:daily_limit]:
         event_key = f"proposal:{profile}:{lead_id}"
-        email = _emails(proposal.get("contact_emails"))[0]
+        emails = _emails(proposal.get("contact_emails"))
+        email = emails[0] if emails else "Não encontrado"
         whatsapp = _whatsapp(proposal)
         maps_url = str(proposal.get("maps_url") or "")
         if not maps_url:
@@ -601,11 +603,11 @@ def run_proposals_now() -> tuple[bool, str]:
     ]
     leads_with_email = sum(bool(_emails(lead.get("contact_emails"))) for lead in leads)
     leads_with_whatsapp = sum(bool(_whatsapp(lead)) for lead in leads)
-    leads_with_both = sum(_eligible_lead(lead) for lead in leads)
+    leads_with_whatsapp_eligible = sum(_eligible_lead(lead) for lead in leads)
     print(
         f"Mapeador — diagnóstico inicial: {len(leads)} estabelecimentos; "
-        f"{leads_with_email} com e-mail, {leads_with_whatsapp} com WhatsApp, "
-        f"{leads_with_both} com ambos. Preparando propostas pendentes...",
+        f"{leads_with_email} com e-mail (opcional), {leads_with_whatsapp} com WhatsApp, "
+        f"{leads_with_whatsapp_eligible} elegíveis pelo WhatsApp. Preparando propostas pendentes...",
         flush=True,
     )
 
@@ -626,7 +628,8 @@ def run_proposals_now() -> tuple[bool, str]:
 
     detail = (
         f"Banco analisado: {len(leads)} estabelecimentos válidos; "
-        f"{leads_with_email} com e-mail, {leads_with_whatsapp} com WhatsApp e {leads_with_both} com ambos. "
+        f"{leads_with_email} com e-mail (opcional), {leads_with_whatsapp} com WhatsApp e "
+        f"{leads_with_whatsapp_eligible} elegíveis pelo WhatsApp. "
         f"4K: {counts['4k']['eligible']} elegíveis, {counts['4k']['unsent']} pendentes, {counts['4k']['sent']} enviados. "
         f"Presença digital: {counts['digital']['eligible']} elegíveis, {counts['digital']['unsent']} pendentes, {counts['digital']['sent']} enviados."
     )
