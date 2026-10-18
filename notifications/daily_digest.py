@@ -301,9 +301,27 @@ def _neighborhood(lead: dict) -> str:
         return "Bairro não identificado" + (f" — {city}" if city else "")
     return f"{neighborhood} — {city}" if city else neighborhood
 
+def _is_distributor(lead: dict) -> bool:
+    """Mantém distribuidoras fora das notificações de prospecção e rotas de clientes."""
+    import unicodedata
+    text = unicodedata.normalize(
+        "NFKD", f"{lead.get('name', '')} {lead.get('category', '')}"
+    ).encode("ascii", "ignore").decode("ascii").casefold()
+    text = re.sub(r"\s+", " ", text).strip()
+    markers = (
+        "distribuidora", "distribuidor", "distribuicao", "atacadista", "atacado",
+        "food service", "foodservice", "fornecedor para restaurantes",
+        "fornecedor de restaurantes", "distribuicao de alimentos"
+    )
+    return any(marker in text for marker in markers)
+
+
 def _send_routes(today: str) -> bool:
     """Envia rotas em lotes de 10 estabelecimentos inéditos por bairro/município."""
-    leads = [item for item in get_leads(path=_db_path()) if item.get("status") == "in_person"]
+    leads = [
+        item for item in get_leads(path=_db_path())
+        if item.get("status") == "in_person" and not _is_distributor(item)
+    ]
     groups: dict[str, list[dict]] = {}
     for lead in leads:
         neighborhood = _neighborhood(lead)
@@ -412,7 +430,7 @@ def _ensure_proposals(limit: int = 15) -> None:
     for lead in leads:
         if processed >= limit or examined >= limit * 3:
             break
-        if lead.get("status") in {"removed", "in_person"}:
+        if lead.get("status") in {"removed", "in_person"} or _is_distributor(lead):
             continue
         examined += 1
         # Try to discover only publicly published contacts on the business's own website.
