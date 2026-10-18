@@ -1491,24 +1491,16 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
  <div class="nav-group"><span>COMERCIAL</span><a href="/campaigns">✉ Campanhas</a><a href="/proposals/4k">Propostas 4K</a><a href="/proposals/digital">Propostas presença digital</a></div>
  <div class="nav-group"><span>AUTOMAÇÃO</span><a href="/automatic">⚙ Modo automático</a></div>
 </nav>
-<section class="panel"><h2>Envios pelo WhatsApp</h2>
+<section class="panel"><h2>Envios automáticos pelo WhatsApp</h2>
 {% if message %}<div class="alert {{ 'success' if message.startswith('OK:') else '' }}">{{ message }}</div>{% endif %}
-<form method="post" action="/notifications/test"><p class="muted">Teste técnico: envia uma única mensagem de teste para o grupo configurado no WhatsApp Web.</p><button type="submit">Testar envio para o WhatsApp agora</button></form><hr style="border-color:var(--line);margin:20px 0">
-<p class="muted">Escolha quantas vezes por dia quer receber as novidades. Depois, defina o horário de cada envio.</p>
+<p class="muted">Sem horários fixos. O Mapeador verifica continuamente as novidades e envia ao grupo Leads quando houver um lote de 5 propostas inéditas por perfil ou uma rota com pelo menos 10 estabelecimentos ainda não notificada no bairro. O registro impede reenvios.</p>
 <form method="post" action="/notifications/schedule" id="notificationScheduleForm">
-<label style="display:flex;align-items:center;gap:10px;margin:10px 0 16px"><input type="checkbox" name="enabled" value="yes" style="width:auto;min-height:0;margin:0" {% if notification_schedule.enabled %}checked{% endif %}> Ativar envios automáticos</label>
-<label for="notificationFrequency">Quantas vezes por dia?</label>
-<select id="notificationFrequency" name="frequency">
-<option value="1" {% if notification_schedule.times|length == 1 %}selected{% endif %}>1 vez por dia</option>
-<option value="2" {% if notification_schedule.times|length == 2 %}selected{% endif %}>2 vezes por dia</option>
-<option value="3" {% if notification_schedule.times|length >= 3 %}selected{% endif %}>3 vezes por dia</option>
-</select>
-<div id="notificationTime1"><label for="time1">Horário do envio 1</label><input id="time1" name="time_1" type="time" required value="{{ notification_schedule.times[0] if notification_schedule.times|length > 0 else '09:00' }}"></div>
-<div id="notificationTime2"><label for="time2">Horário do envio 2</label><input id="time2" name="time_2" type="time" value="{{ notification_schedule.times[1] if notification_schedule.times|length > 1 else '13:00' }}"></div>
-<div id="notificationTime3"><label for="time3">Horário do envio 3</label><input id="time3" name="time_3" type="time" value="{{ notification_schedule.times[2] if notification_schedule.times|length > 2 else '17:30' }}"></div>
-<p class="muted">Em cada horário, o Mapeador verifica rotas elegíveis e propostas novas. Não repete a mesma rota ou proposta. O limite continua sendo até 5 propostas por dia para 4K e 5 para Presença Digital.</p>
-<button type="submit">Salvar configuração</button>
-</form></section>
+<label style="display:flex;align-items:center;gap:10px;margin:10px 0 16px"><input type="checkbox" name="enabled" value="yes" style="width:auto;min-height:0;margin:0" {% if notification_schedule.enabled %}checked{% endif %}> Ativar envios automáticos contínuos</label>
+<button type="submit">Salvar ativação</button>
+</form>
+<form method="post" action="/notifications/test"><p class="muted">Teste manual de conexão com o grupo WhatsApp configurado.</p><button type="submit">Testar envio para o WhatsApp agora</button></form>
+</section>
+</section>
 <section class="panel"><h2>Controle da automação</h2><p><strong>Status:</strong> <span style="color:{{ '#35d49a' if settings.enabled else '#ffcc80' }};font-weight:800">{{ 'LIGADO' if settings.enabled else 'DESLIGADO' }}</span></p>
 <form method="post" action="/automatic/toggle" style="display:flex;gap:10px;flex-wrap:wrap">
 <button type="submit" name="enabled" value="yes" style="background:#35d49a">▶ Ligar automação</button>
@@ -1765,16 +1757,14 @@ def test_whatsapp_notification():
 def save_notification_schedule_route():
     enabled = request.form.get("enabled") == "yes"
     try:
-        frequency = max(1, min(3, int(request.form.get("frequency", "1"))))
-        times_text = ",".join((request.form.get(f"time_{i}") or "").strip() for i in range(1, frequency + 1))
-        set_notification_schedule(enabled, times_text)
+        # Horários deixaram de ser usados; mantemos um valor legado para compatibilidade
+        # com bancos já existentes. A rotina usa somente o estado ligado/desligado.
+        set_notification_schedule(enabled, "09:00")
         _persist_whatsapp_notifications(enabled)
-    except ValueError as exc:
-        return f"Configuração inválida: {exc}", 400
     except OSError as exc:
         app.logger.exception("Não foi possível salvar a autorização do WhatsApp no .env")
-        return f"Horários salvos, mas não consegui atualizar o arquivo .env ({type(exc).__name__}). Verifique permissões da pasta.", 500
-    return redirect(url_for("automatic_mode"))
+        return f"Ativação não salva no arquivo .env ({type(exc).__name__}). Verifique permissões da pasta.", 500
+    return redirect(url_for("automatic_mode", message=("OK: envios contínuos ativados." if enabled else "Envios automáticos desativados.")))
 
 
 @app.get("/proposals/<profile>")
