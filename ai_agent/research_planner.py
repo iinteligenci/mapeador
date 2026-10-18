@@ -13,15 +13,37 @@ load_dotenv()
 
 
 def _fallback_queries(term: str) -> list[str]:
+    """Amplia a busca por categorias diferentes quando a IA não está disponível."""
     base = re.sub(r"\s+", " ", term).strip()
     if not base:
         return []
-    return list(dict.fromkeys([
-        base,
-        f"{base} telefone site",
-        f"{base} fornecedores alimentos",
-        f"{base} WhatsApp contato",
-    ]))
+
+    # Para termos no formato "categoria em cidade", preserve a localidade e varie
+    # o tipo de estabelecimento para não repetir quatro buscas quase idênticas.
+    match = re.match(r"^(.+?)\\s+em\\s+(.+)$", base, flags=re.IGNORECASE)
+    if match:
+        location = match.group(2).strip()
+        categories = [
+            match.group(1).strip(),
+            "bares",
+            "petiscarias",
+            "distribuidoras de alimentos",
+            "açougues",
+            "padarias",
+            "restaurantes",
+        ]
+        queries = [f"{category} em {location}" for category in categories]
+    else:
+        queries = [
+            base,
+            f"bares e petiscarias {base}",
+            f"distribuidoras de alimentos {base}",
+            f"açougues e padarias {base}",
+            f"restaurantes {base}",
+        ]
+    return list(dict.fromkeys(queries))
+
+
 
 
 def plan_deep_searches(term: str, business: dict[str, Any] | None = None, limit: int = 4) -> list[str]:
@@ -42,9 +64,11 @@ def plan_deep_searches(term: str, business: dict[str, Any] | None = None, limit:
         }
     prompt = f"""
 Você é planejador de pesquisa comercial B2B no Brasil. Crie consultas de busca curtas e
-concretas para encontrar fontes públicas verificáveis. Não responda com fatos, não invente
-dados nem nomes de empresas. Priorize: nome oficial/site, contato comercial, telefone/WhatsApp,
-e-mail publicado, cardápio/catálogo, presença digital e aderência a fornecedor de alimentos.
+concretas para encontrar estabelecimentos diferentes no Google Maps. Não responda com fatos,
+não invente dados nem nomes de empresas. Mantenha a localidade e varie as categorias entre
+restaurantes, bares/petiscarias, distribuidoras de alimentos, açougues e padarias quando fizer
+sentido. Evite quatro consultas que sejam apenas a mesma frase com palavras como telefone/site.
+Priorize negócios alimentícios novos, com nome e localidade verificáveis.
 Use o negócio/localidade abaixo e, se houver, o estabelecimento específico.
 Consulta original: {base}
 Estabelecimento: {json.dumps(safe_business, ensure_ascii=False)}
