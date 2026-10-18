@@ -152,7 +152,7 @@ def _send_routes(today: str) -> bool:
                 quote(str(place.get("name") or "") + " " + address)
             ))
             lines.extend([f"• {place.get('name') or 'Estabelecimento'}", f"  Endereço: {address}", f"  Google Maps: {maps_url}", ""])
-        ok, detail = send_to_group("\n".join(lines)[:3500])
+        ok, detail = send_to_group("\n".join(lines)[:10000])
         if ok:
             _mark_sent(event_key, "route", neighborhood, today)
         else:
@@ -171,9 +171,13 @@ def _ensure_proposals(limit: int = 15) -> None:
     proposals = get_proposals(path=_db_path())
     existing = {(int(p.get("lead_id") or 0), str(p.get("profile") or "")) for p in proposals}
     processed = 0
+    examined = 0
     for lead in leads:
-        if processed >= limit:
+        if processed >= limit or examined >= limit * 3:
             break
+        if lead.get("status") in {"removed", "in_person"}:
+            continue
+        examined += 1
         if lead.get("status") in {"removed", "in_person"}:
             continue
         # Try to discover only publicly published contacts on the business's own website.
@@ -261,6 +265,14 @@ def _send_proposals(profile: str, today: str, daily_limit: int = 5) -> tuple[int
             all_ok = False
             logging.warning("Proposta %s para %s não enviada: %s", label, proposal.get("lead_name"), detail)
     return sent_today, all_ok
+
+
+def send_eligible_routes_now() -> tuple[bool, str]:
+    """Envia somente bairros elegíveis, um por mensagem, respeitando o registro antirrepetição."""
+    _init_log()
+    today = datetime.now().astimezone().date().isoformat()
+    ok = _send_routes(today)
+    return ok, "Rotas por bairro verificadas; somente bairros com mais de 10 visitas ainda não notificados são enviados."
 
 
 def run_daily_notifications() -> tuple[bool, str]:
