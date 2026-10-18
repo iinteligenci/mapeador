@@ -916,6 +916,23 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
 <p class="hint">A busca ignora estabelecimentos já encontrados. Para criar uma mensagem, escolha a empresa e clique em “Gerar proposta”. O histórico fica neste computador, no banco SQLite local.</p>
 </section></main>
 <script>
+(function(){
+ const frequency=document.getElementById('notificationFrequency');
+ function updateNotificationTimes(){
+  const n=parseInt(frequency.value||'1',10);
+  [1,2,3].forEach(function(i){
+   const wrap=document.getElementById('notificationTime'+i);
+   const input=document.getElementById('time'+i);
+   wrap.style.display=i<=n?'block':'none';
+   input.required=i===1;
+   input.disabled=i>n;
+  });
+ }
+ frequency.addEventListener('change',updateNotificationTimes);
+ updateNotificationTimes();
+})();
+</script>
+<script>
 /* Navegação contextual: sempre destaca a área atual do fluxo */
 (function(){
   const path = window.location.pathname.replace(/\\/$/, '') || '/';
@@ -1449,14 +1466,21 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
  <div class="nav-group"><span>COMERCIAL</span><a href="/campaigns">✉ Campanhas</a><a href="/proposals/4k">Propostas 4K</a><a href="/proposals/digital">Propostas presença digital</a></div>
  <div class="nav-group"><span>AUTOMAÇÃO</span><a href="/automatic">⚙ Modo automático</a></div>
 </nav>
-<section class="panel"><h2>Notificações WhatsApp</h2>
-<p class="muted">Escolha se quer receber notificações uma ou várias vezes ao dia. Digite os horários no formato 24 horas, separados por vírgula.</p>
-<form method="post" action="/notifications/schedule">
-<label style="display:flex;align-items:center;gap:10px;margin:10px 0 16px"><input type="checkbox" name="enabled" value="yes" style="width:auto;min-height:0;margin:0" {% if notification_schedule.enabled %}checked{% endif %}> Ativar notificações automáticas</label>
-<label>Horários de envio (HH:MM)</label>
-<input name="times" required value="{{ notification_schedule.times|join(', ') }}" placeholder="09:00, 13:00, 17:30">
-<p class="muted">Exemplo: 09:00, 13:00, 17:30. Em cada horário, o sistema verifica rotas elegíveis e novas propostas disponíveis. Não reenvia a mesma rota ou proposta. Mantém o limite de até 5 propostas por dia para cada perfil.</p>
-<button type="submit">Salvar horários</button>
+<section class="panel"><h2>Envios pelo WhatsApp</h2>
+<p class="muted">Escolha quantas vezes por dia quer receber as novidades. Depois, defina o horário de cada envio.</p>
+<form method="post" action="/notifications/schedule" id="notificationScheduleForm">
+<label style="display:flex;align-items:center;gap:10px;margin:10px 0 16px"><input type="checkbox" name="enabled" value="yes" style="width:auto;min-height:0;margin:0" {% if notification_schedule.enabled %}checked{% endif %}> Ativar envios automáticos</label>
+<label for="notificationFrequency">Quantas vezes por dia?</label>
+<select id="notificationFrequency" name="frequency">
+<option value="1" {% if notification_schedule.times|length == 1 %}selected{% endif %}>1 vez por dia</option>
+<option value="2" {% if notification_schedule.times|length == 2 %}selected{% endif %}>2 vezes por dia</option>
+<option value="3" {% if notification_schedule.times|length >= 3 %}selected{% endif %}>3 vezes por dia</option>
+</select>
+<div id="notificationTime1"><label for="time1">Horário do envio 1</label><input id="time1" name="time_1" type="time" required value="{{ notification_schedule.times[0] if notification_schedule.times|length > 0 else '09:00' }}"></div>
+<div id="notificationTime2"><label for="time2">Horário do envio 2</label><input id="time2" name="time_2" type="time" value="{{ notification_schedule.times[1] if notification_schedule.times|length > 1 else '13:00' }}"></div>
+<div id="notificationTime3"><label for="time3">Horário do envio 3</label><input id="time3" name="time_3" type="time" value="{{ notification_schedule.times[2] if notification_schedule.times|length > 2 else '17:30' }}"></div>
+<p class="muted">Em cada horário, o Mapeador verifica rotas elegíveis e propostas novas. Não repete a mesma rota ou proposta. O limite continua sendo até 5 propostas por dia para 4K e 5 para Presença Digital.</p>
+<button type="submit">Salvar configuração</button>
 </form></section>
 <section class="panel"><h2>Controle da automação</h2><p><strong>Status:</strong> <span style="color:{{ '#35d49a' if settings.enabled else '#ffcc80' }};font-weight:800">{{ 'LIGADO' if settings.enabled else 'DESLIGADO' }}</span></p>
 <form method="post" action="/automatic/toggle" style="display:flex;gap:10px;flex-wrap:wrap">
@@ -1676,8 +1700,9 @@ def automatic_save():
 @app.post("/notifications/schedule")
 def save_notification_schedule_route():
     enabled = request.form.get("enabled") == "yes"
-    times_text = (request.form.get("times") or "").strip()
     try:
+        frequency = max(1, min(3, int(request.form.get("frequency", "1"))))
+        times_text = ",".join((request.form.get(f"time_{i}") or "").strip() for i in range(1, frequency + 1))
         set_notification_schedule(enabled, times_text)
     except ValueError as exc:
         return f"Configuração inválida: {exc}", 400
