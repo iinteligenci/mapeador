@@ -134,7 +134,7 @@ def send_to_group(message: str, group_name: str | None = None) -> tuple[bool, st
                 return False, _last_failure_message
 
             # Primeiro verifica se o grupo correto já está aberto; evita depender do seletor de busca.
-            current_header = page.locator("header").inner_text(timeout=10000).casefold()
+            current_header = page.locator('[data-testid="conversation-header"]').first.inner_text(timeout=10000).casefold()
             if group.casefold() not in current_header:
                 search_candidates = [
                     page.locator('div[contenteditable="true"][data-tab="3"]').first,
@@ -172,7 +172,7 @@ def send_to_group(message: str, group_name: str | None = None) -> tuple[bool, st
                 exact_results.last.click(timeout=15000)
                 page.wait_for_timeout(1000)
 
-                current_header = page.locator("header").inner_text(timeout=10000).casefold()
+                current_header = page.locator('[data-testid="conversation-header"]').first.inner_text(timeout=10000).casefold()
                 if group.casefold() not in current_header:
                     _last_failure_at = time.monotonic()
                     _last_failure_message = f"Não consegui confirmar que o chat aberto é '{group}'. Nada foi enviado."
