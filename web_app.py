@@ -1500,7 +1500,6 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
 </form>
 <form method="post" action="/notifications/test"><p class="muted">Teste manual de conexão com o grupo WhatsApp configurado.</p><button type="submit">Testar envio para o WhatsApp agora</button></form>
 </section>
-</section>
 <section class="panel"><h2>Controle da automação</h2><p><strong>Status:</strong> <span style="color:{{ '#35d49a' if settings.enabled else '#ffcc80' }};font-weight:800">{{ 'LIGADO' if settings.enabled else 'DESLIGADO' }}</span></p>
 <form method="post" action="/automatic/toggle" style="display:flex;gap:10px;flex-wrap:wrap">
 <button type="submit" name="enabled" value="yes" style="background:#35d49a">▶ Ligar automação</button>
@@ -1512,7 +1511,7 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
 <label>Limite de novos negócios por busca</label><select name="batch_size">{% for n in [1,2,3,5,10] %}<option value="{{n}}" {% if settings.batch_size == n %}selected{% endif %}>{{n}}</option>{% endfor %}</select>
 <button type="submit">Salvar configuração</button></form>
 <p class="muted">Quando ligada, a automação trabalha continuamente: termina uma tarefa e segue para a próxima, sem esperar 5 minutos entre ciclos. Se não houver trabalho disponível, faz uma pausa curta antes de verificar novamente. O computador e o programa precisam permanecer ligados. Limites de acesso, falhas de sites e limites da API podem atrasar a pesquisa; o sistema não contorna bloqueios.</p>
-<p class="muted"><strong>Importante:</strong> propostas são apenas rascunhos para revisão humana. O Mapeador não envia mensagens automaticamente. Contatos só são usados quando encontrados em páginas públicas; dados não confirmados não são inventados.</p></section></main>
+<p class="muted"><strong>Importante:</strong> o Mapeador envia ao grupo Leads resumos de propostas e rotas. A mensagem comercial sugerida dentro de cada proposta continua identificada como rascunho, e não é enviada diretamente ao estabelecimento. Só são usados contatos publicados em fontes públicas; dados não confirmados não são inventados.</p></section></main>
 <script>
 /* Navegação contextual: sempre destaca a área atual do fluxo */
 (function(){
