@@ -1,9 +1,4 @@
-"""Envio de notificações para o próprio WhatsApp via WhatsApp Web.
-
-Requer WHATSAPP_SELF_NUMBER (formato internacional, apenas dígitos).
-Na primeira execução, faça login/escaneie o QR no navegador que abrir.
-Uso restrito a notificações para o próprio usuário; não envia para leads.
-"""
+"""Notificações pelo WhatsApp Web para o grupo privado do proprietário."""
 from __future__ import annotations
 
 import logging
@@ -18,48 +13,79 @@ from playwright.sync_api import sync_playwright
 _lock = Lock()
 
 
-def send_to_self(message: str) -> tuple[bool, str]:
-    """Envia uma notificação para o próprio número; retorna status sem derrubar o Mapeador."""
-    phone = re.sub(r"\D", "", os.getenv("WHATSAPP_SELF_NUMBER", ""))
-    if not phone:
-        return False, "Configure WHATSAPP_SELF_NUMBER no arquivo .env."
+def _open_context(playwright):
+    profile_dir = Path(os.getenv("WHATSAPP_PROFILE_DIR", "data/whatsapp_profile")).expanduser()
+    profile_dir.mkdir(parents=True, exist_ok=True)
+    return playwright.chromium.launch_persistent_context(
+        user_data_dir=str(profile_dir.resolve()),
+        headless=False,
+        args=["--disable-notifications"],
+        viewport={"width": 1280, "height": 900},
+    )
+
+
+def send_to_group(message: str, group_name: str | None = None) -> tuple[bool, str]:
+    """Envia UMA mensagem para o grupo configurado, nunca para os leads."""
+    group = (group_name or os.getenv("WHATSAPP_GROUP_NAME", "lembrar")).strip()
     if not message.strip():
         return False, "Mensagem vazia."
     if os.getenv("WHATSAPP_NOTIFICATIONS", "false").strip().lower() not in {"1", "true", "yes", "sim"}:
-        return False, "Notificações WhatsApp desativadas; configure WHATSAPP_NOTIFICATIONS=true."
-    if len(phone) < 12 or len(phone) > 15:
-        return False, "WHATSAPP_SELF_NUMBER deve conter DDI + DDD + número, apenas dígitos."
-
-    # Perfil separado e persistente: a sessão permanece conectada entre execuções.
-    profile_dir = Path(os.getenv("WHATSAPP_PROFILE_DIR", "data/whatsapp_profile")).expanduser()
-    profile_dir.mkdir(parents=True, exist_ok=True)
-    url = f"https://web.whatsapp.com/send?phone={phone}&text={quote(message)}"
+        return False, "Notificações WhatsApp desativadas."
+    if not group:
+        return False, "Configure WHATSAPP_GROUP_NAME no .env."
 
     with _lock:
         try:
             with sync_playwright() as playwright:
-                context = playwright.chromium.launch_persistent_context(
-                    user_data_dir=str(profile_dir.resolve()),
-                    headless=False,
-                    args=["--disable-notifications"],
-                    viewport={"width": 1280, "height": 900},
-                )
+                context = _open_context(playwright)
                 try:
                     page = context.pages[0] if context.pages else context.new_page()
-                    page.goto(url, wait_until="domcontentloaded", timeout=60000)
-                    # A primeira execução pode exigir leitura do QR; dê tempo para login.
-                    page.locator('div[contenteditable="true"]').first.wait_for(timeout=120000)
-                    send_button = page.locator('button[aria-label="Enviar"], button[aria-label="Send"]')
-                    if send_button.count():
-                        send_button.last.click(timeout=15000)
-                    else:
-                        # Fallback para a caixa de mensagem do WhatsApp Web.
-                        editable = page.locator('footer div[contenteditable="true"]').last
-                        editable.press("Enter", timeout=15000)
+                    page.goto("https://web.whatsapp.com/", wait_until="domcontentloaded", timeout=60000)
+                    # Aguarda sessão autenticada; primeira execução pode precisar do QR.
+                    page.locator('div[contenteditable="true"]').first.wait_for(timeout=180000)
+
+                    search = page.locator(
+                        'div[contenteditable="true"][data-tab="3"], '
+                        'div[contenteditable="true"][aria-label*="Pesquisar"], '
+                        'div[contenteditable="true"][aria-label*="Search"]'
+                    ).first
+                    search.click(timeout=15000)
+                    search.fill(group)
                     page.wait_for_timeout(1200)
-                    return True, "Notificação enviada para seu WhatsApp."
+
+                    # Clique apenas no resultado com o nome exato do grupo.
+                    exact_results = page.get_by_text(group, exact=True)
+                    if exact_results.count() == 0:
+                        return False, f"Não encontrei um chat com o nome exato '{group}'."
+                    exact_results.last.click(timeout=15000)
+                    page.wait_for_timeout(800)
+
+                    # Confirma que o chat selecionado tem o título esperado, para não enviar ao chat errado.
+                    title = page.locator('header span[title]').all()
+                    title_values = []
+                    for item in title:
+                        try:
+                            value = item.get_attribute("title")
+                            if value:
+                                title_values.append(value.strip())
+                        except Exception:
+                            pass
+                    if group.casefold() not in {value.casefold() for value in title_values}:
+                        return False, f"Não consegui confirmar que o chat aberto é '{group}'. Nada foi enviado."
+
+                    composer = page.locator('footer div[contenteditable="true"]').last
+                    composer.wait_for(timeout=15000)
+                    composer.fill(message[:3500])
+                    composer.press("Enter")
+                    page.wait_for_timeout(1000)
+                    return True, f"Mensagem enviada ao grupo '{group}'."
                 finally:
                     context.close()
         except Exception as exc:
-            logging.warning("Falha ao enviar notificação ao próprio WhatsApp: %s", exc)
-            return False, f"Não foi possível enviar pelo WhatsApp Web ({type(exc).__name__}). Confira o login e tente novamente."
+            logging.warning("Falha ao enviar notificação para grupo WhatsApp: %s", exc)
+            return False, f"Falha no WhatsApp Web ({type(exc).__name__}); confira a sessão e o nome do grupo."
+
+
+def send_to_self(message: str) -> tuple[bool, str]:
+    """Compatibilidade com chamadas anteriores; as notificações vão ao grupo configurado."""
+    return send_to_group(message)
