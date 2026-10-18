@@ -17,7 +17,22 @@ def analyze_lead(lead: dict[str, Any], offer: str | None = None) -> dict[str, An
     """Retorna score, justificativa e mensagem usando os dados públicos coletados."""
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key or api_key == "cole_sua_chave_aqui":
-        raise RuntimeError("Configure GEMINI_API_KEY no arquivo .env antes de executar.")
+        name = str(lead.get("name") or "Olá").strip()
+        category = str(lead.get("category") or "estabelecimento").strip()
+        has_contact = bool(lead.get("phone") or lead.get("website") or lead.get("instagram"))
+        score = 55 if has_contact else 40
+        return {
+            "score": score,
+            "justificativa": (
+                f"Triagem automática sem IA: categoria identificada como {category}; "
+                + ("há ao menos um canal público de contato." if has_contact else "faltam canais públicos de contato confirmados.")
+            ),
+            "mensagem": (
+                f"Olá! Tudo bem? Sou da [NOME DA SUA EMPRESA]. "
+                f"Estou entrando em contato com {name} para apresentar {offer or 'nossos serviços'}. "
+                "Posso enviar uma breve apresentação?"
+            ),
+        }
 
     client = genai.Client(api_key=api_key)
     model_name = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
@@ -114,7 +129,31 @@ def analyze_lead_profiles(lead: dict[str, Any], profiles: list[str], custom_offe
 
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key or api_key == "cole_sua_chave_aqui":
-        raise RuntimeError("Configure GEMINI_API_KEY no arquivo .env antes de executar.")
+        # Modo sem custo/API: cria rascunhos conservadores sem alegar análise por IA.
+        name = str(lead.get("name") or "Olá").strip()
+        category = str(lead.get("category") or "estabelecimento").strip()
+        has_contact = bool(lead.get("phone") or lead.get("website") or lead.get("instagram"))
+        results: dict[str, dict[str, Any]] = {}
+        for profile in selected:
+            if profile == "4k":
+                offer_name = "fornecimento de alimentos da 4K Food Service"
+                reason = f"Triagem automática sem IA: categoria {category}; "
+            else:
+                offer_name = "serviços de presença digital"
+                reason = f"Triagem automática sem IA: categoria {category}; "
+            results[profile] = {
+                "score": 55 if has_contact else 40,
+                "justificativa": reason + (
+                    "há ao menos um canal público de contato." if has_contact
+                    else "faltam canais públicos de contato confirmados."
+                ),
+                "mensagem": (
+                    f"Olá! Tudo bem? Sou da [NOME DA SUA EMPRESA]. "
+                    f"Gostaria de apresentar {offer_name} para {name}. "
+                    "Posso enviar uma breve apresentação?"
+                ),
+            }
+        return results
     client = genai.Client(api_key=api_key)
     model_name = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
 
