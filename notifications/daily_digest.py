@@ -595,6 +595,7 @@ def run_proposals_now() -> tuple[bool, str]:
     """Executa um ciclo imediato e informa por que propostas não foram enviadas."""
     _init_log()
     today = datetime.now().astimezone().date().isoformat()
+    print("Mapeador — diagnóstico manual: lendo estabelecimentos e contatos...", flush=True)
     leads = [
         lead for lead in get_leads(path=_db_path())
         if lead.get("status") not in {"removed", "in_person"} and not _is_distributor(lead)
@@ -602,8 +603,15 @@ def run_proposals_now() -> tuple[bool, str]:
     leads_with_email = sum(bool(_emails(lead.get("contact_emails"))) for lead in leads)
     leads_with_whatsapp = sum(bool(_whatsapp(lead)) for lead in leads)
     leads_with_both = sum(_eligible_lead(lead) for lead in leads)
+    print(
+        f"Mapeador — diagnóstico inicial: {len(leads)} estabelecimentos; "
+        f"{leads_with_email} com e-mail, {leads_with_whatsapp} com WhatsApp, "
+        f"{leads_with_both} com ambos. Preparando propostas pendentes...",
+        flush=True,
+    )
 
     _ensure_proposals(limit=30)
+    print("Mapeador — preparação de propostas concluída; verificando envios por perfil...", flush=True)
     counts = {}
     for profile in ("4k", "digital"):
         proposals = get_proposals(profile=profile, path=_db_path())
