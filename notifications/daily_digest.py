@@ -117,8 +117,8 @@ def run_scheduled_notifications() -> tuple[bool, str]:
     today = datetime.now().astimezone().date().isoformat()
     ok_routes = _send_routes(today)
     _ensure_proposals(limit=15)
-    count_4k, ok_4k = _send_proposals("4k", today, 5)
-    count_digital, ok_digital = _send_proposals("digital", today, 5)
+    count_4k, ok_4k = _send_proposals("4k", today, 1)
+    count_digital, ok_digital = _send_proposals("digital", today, 1)
     return (ok_routes and ok_4k and ok_digital,
             f"{count_4k} propostas 4K e {count_digital} propostas de presença digital enviadas; rotas elegíveis verificadas.")
 
@@ -476,7 +476,7 @@ def _send_proposals(profile: str, today: str, daily_limit: int = 5) -> tuple[int
     unique: dict[int, dict] = {}
     for proposal in proposals:
         lead_id = int(proposal.get("lead_id") or 0)
-        if not lead_id or lead_id in unique:
+        if not lead_id or lead_id in unique or _is_distributor(proposal):
             continue
         if _emails(proposal.get("contact_emails")) and _whatsapp(proposal):
             unique[lead_id] = proposal
@@ -485,8 +485,9 @@ def _send_proposals(profile: str, today: str, daily_limit: int = 5) -> tuple[int
         for lead_id, proposal in sorted(unique.items(), key=lambda item: (-int(item[1].get("score") or 0), item[0]))
         if not _was_sent(f"proposal:{profile}:{lead_id}")
     ]
-    # Só dispara quando há um lote completo de cinco propostas inéditas.
-    if len(unsent) < daily_limit:
+    # Envia as melhores propostas disponíveis sem exigir um lote de cinco.
+    # O chamador limita a quantidade por ciclo para evitar rajadas no WhatsApp.
+    if not unsent or daily_limit <= 0:
         return 0, True
     sent_this_cycle = 0
     all_ok = True
@@ -540,8 +541,8 @@ def run_daily_notifications() -> tuple[bool, str]:
         return True, "Rotina diária já concluída."
     ok = _send_routes(today)
     _ensure_proposals(limit=15)
-    count_4k, ok_4k = _send_proposals("4k", today, 5)
-    count_digital, ok_digital = _send_proposals("digital", today, 5)
+    count_4k, ok_4k = _send_proposals("4k", today, 1)
+    count_digital, ok_digital = _send_proposals("digital", today, 1)
     ok = ok and ok_4k and ok_digital
     # Mark the date complete only when every attempted send succeeded.
     # Successful individual messages are independently logged, so retries won't duplicate them.
