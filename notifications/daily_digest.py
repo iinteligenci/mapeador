@@ -426,13 +426,11 @@ def _ensure_proposals(limit: int = 15) -> None:
     proposals = get_proposals(path=_db_path())
     existing = {(int(p.get("lead_id") or 0), str(p.get("profile") or "")) for p in proposals}
     processed = 0
-    examined = 0
     for lead in leads:
-        if processed >= limit or examined >= limit * 3:
+        if processed >= limit:
             break
         if lead.get("status") in {"removed", "in_person"} or _is_distributor(lead):
             continue
-        examined += 1
         # Try to discover only publicly published contacts on the business's own website.
         if not _eligible_lead(lead) and str(lead.get("website") or "").startswith(("https://", "http://")):
             try:
