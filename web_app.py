@@ -891,13 +891,14 @@ def set_status():
         update_lead_status(lead_id, status, db_path)
     except (ValueError, TypeError) as exc:
         return f"Não foi possível atualizar a etapa: {exc}", 400
-    if source == "history":
+    if source in {"history", "distributors"}:
         selected = (request.form.get("selected") or "all").strip()
         if selected not in {"all", "to_visit", "visited", "client"}:
             selected = "all"
+        endpoint = "distributors" if source == "distributors" else "history"
         if selected == "all":
-            return redirect(url_for("history"))
-        return redirect(url_for("history", status=selected))
+            return redirect(url_for(endpoint))
+        return redirect(url_for(endpoint, status=selected))
     return redirect(url_for("visits" if status == "in_person" else "removed" if status == "removed" else "history"))
 
 
@@ -1285,6 +1286,9 @@ REMOVED_PAGE = HISTORY_PAGE.replace("Mapeador | Estabelecimentos encontrados", "
 VISITS_PAGE = HISTORY_PAGE.replace("Mapeador | Estabelecimentos encontrados", "Mapeador | Visitas presenciais").replace("<h1>Estabelecimentos encontrados</h1>", "<h1>Visitas presenciais</h1>").replace("Seu histórico comercial fica salvo no banco local.", "Lista separada de estabelecimentos reservados para abordagem presencial. Não entram nas campanhas nem na lista geral.").replace("{{ leads|length }} estabelecimento(s) nesta lista", "{{ leads|length }} estabelecimento(s) para visita presencial").replace('<div class="filters">', '<div class="filters" style="display:none">")
 
 DISTRIBUTORS_PAGE = HISTORY_PAGE.replace(
+    '<input type="hidden" name="return_to" value="history">',
+    '<input type="hidden" name="return_to" value="distributors">'
+).replace(
     "Mapeador | Estabelecimentos encontrados", "Mapeador | Distribuidoras"
 ).replace(
     "<h1>Estabelecimentos encontrados</h1>", "<h1>Distribuidoras</h1>"
@@ -1292,7 +1296,7 @@ DISTRIBUTORS_PAGE = HISTORY_PAGE.replace(
     "Seu histórico comercial fica salvo no banco local.", "Prospecção separada para análise de concorrentes e distribuidores."
 ).replace(
     '<section class="panel"><h2>{{ leads|length }} estabelecimento(s) nesta lista</h2>',
-    '<section class="panel">{% if message %}<div class="alert {{ 'success' if message.startswith('Pesquisa concluída:') else '' }}">{{ message }}</div>{% endif %}<h2>Pesquisar distribuidoras</h2><form method="post" action="/distributors/search"><div class="formgrid"><div><label>Município</label><input name="city" value="{{ city or \'Vila Velha\' }}" required placeholder="Ex.: Vila Velha"></div><div><label>Quantidade máxima</label><select name="limit">{% for n in [3,5,10,15] %}<option value="{{n}}" {% if limit == n %}selected{% endif %}>{{n}}</option>{% endfor %}</select></div></div><button type="submit">Iniciar prospecção de distribuidoras</button><p class="hint">Esta pesquisa é manual e independente. Os resultados não aparecem em Estabelecimentos encontrados.</p></form></section><section class="panel"><h2>{{ leads|length }} distribuidora(s) nesta lista</h2>'
+    '<section class="panel">{% if message %}<div class="alert">{{ message }}</div>{% endif %}<h2>Pesquisar distribuidoras</h2><form method="post" action="/distributors/search"><div class="formgrid"><div><label>Município</label><input name="city" value="{{ city or \'Vila Velha\' }}" required placeholder="Ex.: Vila Velha"></div><div><label>Quantidade máxima</label><select name="limit">{% for n in [3,5,10,15] %}<option value="{{n}}" {% if limit == n %}selected{% endif %}>{{n}}</option>{% endfor %}</select></div></div><button type="submit">Iniciar prospecção de distribuidoras</button><p class="hint">Esta pesquisa é manual e independente. Os resultados não aparecem em Estabelecimentos encontrados.</p></form></section><section class="panel"><h2>{{ leads|length }} distribuidora(s) nesta lista</h2>'
 ).replace(
     '<div class="filters category-filters" aria-label="Categorias de estabelecimentos">\n{% for key, label in categories.items() %}<a href="/history?group={{ key }}" class="{{ \'active\' if selected_group == key else \'\' }}">{{ label }} ({{ grouped_leads[key]|length }})</a>{% endfor %}\n</div>',
     ''
