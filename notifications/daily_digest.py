@@ -337,6 +337,7 @@ def _send_routes(today: str) -> bool:
                         "VALUES (?, 'route_place', ?, ?, ?)",
                         (f"route_place:{neighborhood.casefold()}:{lead_id}", neighborhood, old_route["sent_date"], sent_at),
                     )
+                conn.commit()
 
             unsent = []
             for place in sorted(places, key=lambda item: (str(item.get("name") or "").casefold(), int(item.get("id") or 0))):
