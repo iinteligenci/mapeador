@@ -87,15 +87,65 @@ def _save_diagnostic(page, exc) -> str:
 
 
 def _find_search_box(page):
+    """Localiza a pesquisa lateral tanto na interface antiga quanto na nova do WhatsApp Web."""
     return _visible_first([
         page.locator('[data-testid="chat-list-search"]'),
+        page.locator('[data-testid="chat-list-search-input"]'),
+        page.locator('#side input[placeholder*="Pesquisar"]'),
+        page.locator('#side input[placeholder*="Search"]'),
+        page.locator('#side input[aria-label*="Pesquisar"]'),
+        page.locator('#side input[aria-label*="Search"]'),
+        page.locator('#side div[contenteditable="true"][role="textbox"]'),
+        page.locator('#side div[contenteditable="true"]'),
+        page.locator('[role="textbox"][contenteditable="true"][data-tab="3"]'),
         page.locator('div[contenteditable="true"][data-tab="3"]'),
         page.locator('div[contenteditable="true"][aria-label*="Pesquisar"]'),
         page.locator('div[contenteditable="true"][aria-label*="Search"]'),
-        page.locator('[role="textbox"][contenteditable="true"][data-tab="3"]'),
+        page.locator('input[placeholder*="Pesquisar"]'),
+        page.locator('input[placeholder*="Search"]'),
+        page.locator('input[aria-label*="Pesquisar"]'),
+        page.locator('input[aria-label*="Search"]'),
+    ])
+
+
+def _activate_search(page):
+    """Expande a pesquisa se a versão do WhatsApp mostrar somente o botão/lupa."""
+    search = _find_search_box(page)
+    if search is not None:
+        try:
+            tag = search.evaluate("(el) => el.tagName.toLowerCase()")
+            if tag not in {"button", "svg"}:
+                return search
+        except Exception:
+            return search
+
+    button = _visible_first([
         page.locator('button[aria-label*="Pesquisar"]'),
         page.locator('button[aria-label*="Search"]'),
+        page.locator('[data-testid="chat-list-search"] button'),
+        page.locator('#side button[title*="Pesquisar"]'),
+        page.locator('#side button[title*="Search"]'),
+        page.locator('#side [role="button"][aria-label*="Pesquisar"]'),
+        page.locator('#side [role="button"][aria-label*="Search"]'),
     ])
+    if button is not None:
+        try:
+            button.click(timeout=4000)
+            page.wait_for_timeout(500)
+        except Exception:
+            pass
+
+    search = _find_search_box(page)
+    if search is not None:
+        return search
+
+    # Atalho de pesquisa do WhatsApp Web; depois dele, reconsulta os campos.
+    try:
+        page.keyboard.press("Control+f")
+        page.wait_for_timeout(500)
+    except Exception:
+        pass
+    return _find_search_box(page)
 
 
 def _open_target_group(page, group: str) -> tuple[bool, str]:
@@ -103,17 +153,27 @@ def _open_target_group(page, group: str) -> tuple[bool, str]:
     if group.casefold() in current_header:
         return True, ""
 
-    search = _find_search_box(page)
+    search = _activate_search(page)
     if search is None:
-        return False, "WhatsApp abriu, mas não encontrei a pesquisa de conversas."
+        diagnostic = _save_diagnostic(page, RuntimeError("campo de pesquisa não localizado"))
+        logging.warning("Mapeador WhatsApp: pesquisa não localizada. %s", diagnostic[:700])
+        return False, (
+            "WhatsApp abriu, mas não encontrei a pesquisa de conversas. "
+            "Salvei um diagnóstico em data/whatsapp_load_error.txt para identificar a interface aberta."
+        )
 
     try:
         search.click(timeout=8000)
         try:
             search.fill(group, timeout=5000)
         except Exception:
-            search.press("Control+A")
-            search.type(group, delay=60)
+            try:
+                search.press("Control+A")
+                search.type(group, delay=60)
+            except Exception:
+                # Alguns campos modernos só aceitam inserção via teclado após focar.
+                page.keyboard.press("Control+A")
+                page.keyboard.type(group, delay=60)
         page.wait_for_timeout(1800)
 
         # Prioriza o painel lateral para não clicar em texto de outra área da página.
