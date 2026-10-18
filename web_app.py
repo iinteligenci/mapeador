@@ -1697,6 +1697,28 @@ def automatic_save():
     return redirect(url_for("automatic_mode"))
 
 
+def _persist_whatsapp_notifications(enabled: bool) -> None:
+    """Mantém a autorização de envio alinhada com o controle da interface local."""
+    value = "true" if enabled else "false"
+    os.environ["WHATSAPP_NOTIFICATIONS"] = value
+    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+    try:
+        with open(env_path, "r", encoding="utf-8") as handle:
+            lines = handle.read().splitlines()
+    except FileNotFoundError:
+        lines = []
+    updated = False
+    for index, line in enumerate(lines):
+        if line.strip().startswith("WHATSAPP_NOTIFICATIONS="):
+            lines[index] = f"WHATSAPP_NOTIFICATIONS={value}"
+            updated = True
+            break
+    if not updated:
+        lines.append(f"WHATSAPP_NOTIFICATIONS={value}")
+    with open(env_path, "w", encoding="utf-8", newline="\\n") as handle:
+        handle.write("\\n".join(lines).rstrip() + "\\n")
+
+
 @app.post("/notifications/schedule")
 def save_notification_schedule_route():
     enabled = request.form.get("enabled") == "yes"
@@ -1704,8 +1726,12 @@ def save_notification_schedule_route():
         frequency = max(1, min(3, int(request.form.get("frequency", "1"))))
         times_text = ",".join((request.form.get(f"time_{i}") or "").strip() for i in range(1, frequency + 1))
         set_notification_schedule(enabled, times_text)
+        _persist_whatsapp_notifications(enabled)
     except ValueError as exc:
         return f"Configuração inválida: {exc}", 400
+    except OSError as exc:
+        app.logger.exception("Não foi possível salvar a autorização do WhatsApp no .env")
+        return f"Horários salvos, mas não consegui atualizar o arquivo .env ({type(exc).__name__}). Verifique permissões da pasta.", 500
     return redirect(url_for("automatic_mode"))
 
 
