@@ -549,6 +549,42 @@ def run_daily_notifications() -> tuple[bool, str]:
     return ok, f"Rotina {today}: {count_4k}/5 propostas 4K e {count_digital}/5 propostas de presença digital enviadas. Rotas elegíveis verificadas."
 
 
+
+def run_proposals_now() -> tuple[bool, str]:
+    """Executa um ciclo imediato e informa por que propostas não foram enviadas."""
+    _init_log()
+    today = datetime.now().astimezone().date().isoformat()
+    leads = [
+        lead for lead in get_leads(path=_db_path())
+        if lead.get("status") not in {"removed", "in_person"} and not _is_distributor(lead)
+    ]
+    leads_with_email = sum(bool(_emails(lead.get("contact_emails"))) for lead in leads)
+    leads_with_whatsapp = sum(bool(_whatsapp(lead)) for lead in leads)
+    leads_with_both = sum(_eligible_lead(lead) for lead in leads)
+
+    _ensure_proposals(limit=30)
+    counts = {}
+    for profile in ("4k", "digital"):
+        proposals = get_proposals(profile=profile, path=_db_path())
+        eligible = {}
+        for proposal in proposals:
+            lead_id = int(proposal.get("lead_id") or 0)
+            if lead_id and lead_id not in eligible and not _is_distributor(proposal):
+                if _emails(proposal.get("contact_emails")) and _whatsapp(proposal):
+                    eligible[lead_id] = proposal
+        unsent = [lead_id for lead_id in eligible if not _was_sent(f"proposal:{profile}:{lead_id}")]
+        sent, ok = _send_proposals(profile, today, 1)
+        counts[profile] = {"eligible": len(eligible), "unsent": len(unsent), "sent": sent, "ok": ok}
+
+    detail = (
+        f"Banco analisado: {len(leads)} estabelecimentos válidos; "
+        f"{leads_with_email} com e-mail, {leads_with_whatsapp} com WhatsApp e {leads_with_both} com ambos. "
+        f"4K: {counts['4k']['eligible']} elegíveis, {counts['4k']['unsent']} pendentes, {counts['4k']['sent']} enviados. "
+        f"Presença digital: {counts['digital']['eligible']} elegíveis, {counts['digital']['unsent']} pendentes, {counts['digital']['sent']} enviados."
+    )
+    ok = counts["4k"]["ok"] and counts["digital"]["ok"]
+    return ok, detail
+
 def daily_notifications_loop() -> None:
     """Busca continuamente lotes de propostas e rotas ainda não notificados."""
     _init_log()
