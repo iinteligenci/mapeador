@@ -210,9 +210,11 @@ def _city_from_address(address: str) -> str:
 
 def _neighborhood(lead: dict) -> str:
     """Retorna bairro + município, evitando juntar bairros homônimos de cidades diferentes."""
-    address = re.sub(r"\s+", " ", str(lead.get("address") or "")).strip()
+    address = re.sub(r"\s+", " ", str(lead.get("address") or lead.get("formatted_address") or "")).strip()
     folded = _fold(address)
-    city = _city_from_address(address)
+    city = _city_from_address(address) or _city_from_address(
+        str(lead.get("city") or lead.get("municipality") or lead.get("locality") or "")
+    )
 
     aliases = [
         ("Praia da Costa", ("praia da costa",)),
