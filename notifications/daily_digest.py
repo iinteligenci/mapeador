@@ -308,7 +308,7 @@ def _is_4k_competitor(lead: dict) -> bool:
     text = unicodedata.normalize(
         "NFKD", f"{lead.get('lead_name', lead.get('name', ''))} {lead.get('category', '')}"
     ).encode("ascii", "ignore").decode("ascii").casefold()
-    text = re.sub(r"\\s+", " ", text).strip()
+    text = re.sub(r"\s+", " ", text).strip()
     markers = (
         "acougue", "casa de carnes", "casa das carnes", "boutique de carnes",
         "aviario", "casa de aves", "casa de frango", "aves e ovos", "casa de ovos",
