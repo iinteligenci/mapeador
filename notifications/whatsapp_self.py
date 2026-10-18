@@ -92,38 +92,68 @@ def send_to_group(message: str, group_name: str | None = None) -> tuple[bool, st
                 )
                 return False, _last_failure_message
 
-            search = page.locator(
-                'div[contenteditable="true"][data-tab="3"], '
-                'div[contenteditable="true"][aria-label*="Pesquisar"], '
-                'div[contenteditable="true"][aria-label*="Search"]'
-            ).first
-            search.click(timeout=15000)
-            search.fill(group)
-            page.wait_for_timeout(1200)
+            # Primeiro verifica se o grupo correto já está aberto; evita depender do seletor de busca.
+            current_header = page.locator("header").inner_text(timeout=10000).casefold()
+            if group.casefold() not in current_header:
+                search_candidates = [
+                    page.locator('div[contenteditable="true"][data-tab="3"]').first,
+                    page.locator('div[contenteditable="true"][aria-label*="Pesquisar"]').first,
+                    page.locator('div[contenteditable="true"][aria-label*="Search"]').first,
+                    page.locator('button[aria-label*="Pesquisar"]').first,
+                    page.locator('button[aria-label*="Search"]').first,
+                ]
+                search = None
+                for candidate in search_candidates:
+                    try:
+                        if candidate.count() and candidate.is_visible():
+                            search = candidate
+                            break
+                    except Exception:
+                        continue
+                if search is None:
+                    _last_failure_at = time.monotonic()
+                    _last_failure_message = "WhatsApp abriu, mas não encontrei o campo de pesquisa. Nenhuma mensagem foi enviada."
+                    return False, _last_failure_message
 
-            exact_results = page.get_by_text(group, exact=True)
-            if exact_results.count() == 0:
-                _last_failure_at = time.monotonic()
-                _last_failure_message = f"Não encontrei um chat com o nome exato '{group}'."
-                return False, _last_failure_message
-            exact_results.last.click(timeout=15000)
-            page.wait_for_timeout(800)
-
-            title = page.locator('header span[title]').all()
-            title_values = []
-            for item in title:
+                search.click(timeout=15000)
                 try:
-                    value = item.get_attribute("title")
-                    if value:
-                        title_values.append(value.strip())
+                    search.fill(group, timeout=10000)
                 except Exception:
-                    pass
-            if group.casefold() not in {value.casefold() for value in title_values}:
-                _last_failure_at = time.monotonic()
-                _last_failure_message = f"Não consegui confirmar que o chat aberto é '{group}'. Nada foi enviado."
-                return False, _last_failure_message
+                    search.press("Control+A")
+                    search.type(group, delay=80)
+                page.wait_for_timeout(1800)
 
-            composer = page.locator('footer div[contenteditable="true"]').last
+                exact_results = page.get_by_text(group, exact=True)
+                if exact_results.count() == 0:
+                    _last_failure_at = time.monotonic()
+                    _last_failure_message = f"Não encontrei um chat com o nome exato '{group}'."
+                    return False, _last_failure_message
+                exact_results.last.click(timeout=15000)
+                page.wait_for_timeout(1000)
+
+                current_header = page.locator("header").inner_text(timeout=10000).casefold()
+                if group.casefold() not in current_header:
+                    _last_failure_at = time.monotonic()
+                    _last_failure_message = f"Não consegui confirmar que o chat aberto é '{group}'. Nada foi enviado."
+                    return False, _last_failure_message
+
+            composer_candidates = [
+                page.locator('footer div[contenteditable="true"]').last,
+                page.locator('div[contenteditable="true"][aria-label*="Mensagem"]').last,
+                page.locator('div[contenteditable="true"][aria-label*="Message"]').last,
+            ]
+            composer = None
+            for candidate in composer_candidates:
+                try:
+                    if candidate.count() and candidate.is_visible():
+                        composer = candidate
+                        break
+                except Exception:
+                    continue
+            if composer is None:
+                _last_failure_at = time.monotonic()
+                _last_failure_message = "O grupo foi aberto, mas não encontrei a caixa de mensagem. Nada foi enviado."
+                return False, _last_failure_message
             composer.wait_for(timeout=15000)
             composer.fill(message[:10000])
             composer.press("Enter")
