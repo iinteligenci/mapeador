@@ -188,6 +188,9 @@ async def search_google_maps(term: str, limit: int = 10, exclude_links: set[str]
                 except Exception as exc:
                     logger.debug("Detalhes incompletos para %s: %s", lead["name"], exc)
                 results.append(lead)
+            # Mantém os cartões restantes mesmo quando não abrimos suas fichas detalhadas.
+            # Assim uma ficha lenta não elimina resultados já coletados da pesquisa.
+            results.extend(candidates[min(limit, 5):limit])
         finally:
             await context.close()
             await browser.close()
