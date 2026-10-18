@@ -20,10 +20,10 @@ def _clean(value: str | None) -> str:
     return re.sub(r"\s+", " ", value or "").strip()
 
 
-async def _goto_with_retries(page, url: str, timeout: int = 35000) -> bool:
+async def _goto_with_retries(page, url: str, timeout: int = 18000) -> bool:
     """Tenta recuperar falhas transitórias de rede sem derrubar a automação."""
     import asyncio
-    for attempt, delay in enumerate((0, 3, 8), start=1):
+    for attempt, delay in enumerate((0, 2), start=1):
         if delay:
             await asyncio.sleep(delay)
         try:
@@ -36,10 +36,10 @@ async def _goto_with_retries(page, url: str, timeout: int = 35000) -> bool:
                 "ERR_CONNECTION_RESET", "ERR_CONNECTION_CLOSED",
                 "ERR_NAME_NOT_RESOLVED", "Timeout"
             ))
-            if not transient or attempt == 3:
+            if not transient or attempt == 2:
                 logger.warning("Navegação falhou após %s tentativa(s): %s | %s", attempt, url, message[:220])
                 return False
-            logger.warning("Falha de rede na tentativa %s/3; aguardando para tentar novamente: %s", attempt, message[:160])
+            logger.warning("Falha de rede na tentativa %s/2; aguardando para tentar novamente: %s", attempt, message[:160])
     return False
 
 
@@ -61,11 +61,11 @@ async def search_google_maps(term: str, limit: int = 10, exclude_links: set[str]
         page = await context.new_page()
         try:
             search_url = f"https://www.google.com/maps/search/{quote_plus(term)}"
-            if not await _goto_with_retries(page, search_url, timeout=35000):
+            if not await _goto_with_retries(page, search_url, timeout=18000):
                 return []
             feed = page.locator('div[role="feed"]')
             try:
-                await feed.wait_for(timeout=9000)
+                await feed.wait_for(timeout=6000)
             except PlaywrightTimeoutError:
                 logger.warning("Lista indisponível; o Maps pode ter mudado ou limitado o acesso.")
                 return []
@@ -145,9 +145,9 @@ async def search_google_maps(term: str, limit: int = 10, exclude_links: set[str]
                         continue
                 return ""
 
-            for lead in candidates[:limit]:
+            # Enrich a small batch only; the list view itself remains useful if detail pages stall.\n            for lead in candidates[:min(limit, 5)]:
                 try:
-                    if not await _goto_with_retries(page, lead["link"], timeout=22000):
+                    if not await _goto_with_retries(page, lead["link"], timeout=12000):
                         results.append(lead)
                         continue
                     try:
