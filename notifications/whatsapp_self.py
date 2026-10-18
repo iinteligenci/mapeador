@@ -43,6 +43,25 @@ def _get_whatsapp_page():
     return _page
 
 
+def _read_current_chat_header(page) -> str:
+    """Lê o cabeçalho da conversa sem depender de um único seletor do WhatsApp."""
+    try:
+        specific = page.locator('[data-testid="conversation-header"]')
+        if specific.count():
+            value = specific.first.inner_text(timeout=2500).strip()
+            if value:
+                return value.casefold()
+    except Exception:
+        pass
+    try:
+        headers = page.locator("header").all_inner_texts()
+        # Cabeçalhos incluem o painel lateral e a conversa; juntar textos evita
+        # strict-mode e tolera mudanças no DOM entre versões do WhatsApp.
+        return " ".join(value.strip() for value in headers if value.strip()).casefold()
+    except Exception:
+        return ""
+
+
 def send_to_group(message: str, group_name: str | None = None) -> tuple[bool, str]:
     """Envia UMA mensagem para o grupo configurado, mantendo a sessão do navegador aberta."""
     group = (group_name or os.getenv("WHATSAPP_GROUP_NAME", "Leads")).strip()
@@ -134,7 +153,7 @@ def send_to_group(message: str, group_name: str | None = None) -> tuple[bool, st
                 return False, _last_failure_message
 
             # Primeiro verifica se o grupo correto já está aberto; evita depender do seletor de busca.
-            current_header = page.locator('[data-testid="conversation-header"]').first.inner_text(timeout=10000).casefold()
+            current_header = _read_current_chat_header(page)
             if group.casefold() not in current_header:
                 search_candidates = [
                     page.locator('div[contenteditable="true"][data-tab="3"]').first,
