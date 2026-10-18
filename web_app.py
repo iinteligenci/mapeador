@@ -387,6 +387,18 @@ def _is_distributor(lead: dict[str, Any]) -> bool:
     ))
 
 
+
+def _is_4k_competitor(lead: dict[str, Any]) -> bool:
+    """Varejistas alimentícios que podem concorrer com a revenda da 4K; ainda podem receber oferta digital."""
+    text = _fold_text(f"{lead.get('name', '')} {lead.get('category', '')}")
+    markers = (
+        "acougue", "casa de carnes", "casa das carnes", "boutique de carnes",
+        "aviario", "casa de aves", "casa de frango", "aves e ovos", "casa de ovos",
+        "peixaria", "pescados", "mercado", "supermercado", "mercearia",
+        "hortifruti", "hortifrut", "sacolao", "emporio", "casa de frios",
+    )
+    return any(marker in text for marker in markers)
+
 def _is_food_consumer_business(lead: dict[str, Any]) -> bool:
     text = _fold_text(f"{lead.get('name', '')} {lead.get('category', '')}")
     if _is_distributor(lead):
@@ -626,6 +638,10 @@ def generate_proposal():
     if profile not in {"4k", "digital", "both"}:
         profile = "4k"
     selected_profiles = ["4k", "digital"] if profile == "both" else [profile]
+    if _is_4k_competitor(saved):
+        selected_profiles = [p for p in selected_profiles if p != "4k"]
+        if not selected_profiles:
+            return redirect(url_for("history", message="Este tipo de comércio é concorrente da 4K; somente propostas de presença digital são permitidas."))
     offer = (request.form.get("proposal_offer") or "").strip()
     lead = {
         "name": saved.get("name", ""),
@@ -2209,7 +2225,8 @@ def _background_research_loop() -> None:
                                 "public_platforms": research.get("public_platforms", []),
                                 "research_notes": research.get("research_notes", []),
                             }
-                            analyses = analyze_lead_profiles(lead_for_ai, ["4k", "digital"])
+                            profiles_to_analyze = ["digital"] if _is_4k_competitor(saved) else ["4k", "digital"]
+                            analyses = analyze_lead_profiles(lead_for_ai, profiles_to_analyze)
                             for profile_key, analysis in analyses.items():
                                 for contact_type, contact_value, source_url in endpoints:
                                     save_proposal(int(saved["id"]), profile_key, contact_type,
