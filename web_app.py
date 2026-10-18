@@ -399,6 +399,23 @@ def _is_4k_competitor(lead: dict[str, Any]) -> bool:
     )
     return any(marker in text for marker in markers)
 
+
+def _is_4k_target(lead: dict[str, Any]) -> bool:
+    """Só restaurantes, bares e operações de alimentação semelhantes são clientes potenciais da 4K."""
+    text = _fold_text(f"{lead.get('name', lead.get('lead_name', ''))} {lead.get('category', '')}")
+    if _is_distributor(lead) or _is_4k_competitor(lead):
+        return False
+    allowed = (
+        "restaurante", "restaurant", "bar ", "bar e", "bar&", "boteco", "pub",
+        "petiscaria", "petiscos", "gastrobar", "gastropub", "churrascaria",
+        "self service", "self-service", "buffet", "lanchonete", "hamburgueria",
+        "pizzaria", "cantina", "bistro", "bistrô", "cozinha profissional",
+        "cozinha industrial", "casa de massas", "rotisseria", "marmitaria",
+        "food truck", "cervejaria", "casa de eventos", "catering"
+    )
+    return any(term in text for term in allowed)
+
+
 def _is_food_consumer_business(lead: dict[str, Any]) -> bool:
     text = _fold_text(f"{lead.get('name', '')} {lead.get('category', '')}")
     if _is_distributor(lead):
@@ -638,7 +655,7 @@ def generate_proposal():
     if profile not in {"4k", "digital", "both"}:
         profile = "4k"
     selected_profiles = ["4k", "digital"] if profile == "both" else [profile]
-    if _is_4k_competitor(saved):
+    if not _is_4k_target(saved):
         selected_profiles = [p for p in selected_profiles if p != "4k"]
         if not selected_profiles:
             return redirect(url_for("history", message="Este tipo de comércio é concorrente da 4K; somente propostas de presença digital são permitidas."))
@@ -2057,7 +2074,7 @@ def _background_research_loop() -> None:
                 try:
                     existing_proposals = get_proposals(path=db_path)
                     stale = next((p for p in existing_proposals if int(p.get("priority_version") or 0) < 1), None)
-                    if stale and stale.get("profile") in {"4k", "digital"}:
+                    if stale and stale.get("profile") in {"4k", "digital"} and (stale.get("profile") != "4k" or _is_4k_target(stale)):
                         lead_for_scoring = {
                             "name": stale.get("lead_name", ""),
                             "category": stale.get("category", ""),
@@ -2225,7 +2242,7 @@ def _background_research_loop() -> None:
                                 "public_platforms": research.get("public_platforms", []),
                                 "research_notes": research.get("research_notes", []),
                             }
-                            profiles_to_analyze = ["digital"] if _is_4k_competitor(saved) else ["4k", "digital"]
+                            profiles_to_analyze = ["4k", "digital"] if _is_4k_target(saved) else ["digital"]
                             analyses = analyze_lead_profiles(lead_for_ai, profiles_to_analyze)
                             for profile_key, analysis in analyses.items():
                                 for contact_type, contact_value, source_url in endpoints:
