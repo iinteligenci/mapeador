@@ -43,8 +43,8 @@ def _set_local_env_value(key: str, value: str) -> None:
             break
     else:
         lines.append(prefix + value)
-    with open(env_path, "w", encoding="utf-8", newline="\\n") as handle:
-        handle.write("\\n".join(lines).rstrip() + "\\n")
+    with open(env_path, "w", encoding="utf-8", newline="") as handle:
+        handle.write("\n".join(lines).rstrip() + "\n")
 
 
 # Grupo definido pelo usuário para receber rotas e propostas.
