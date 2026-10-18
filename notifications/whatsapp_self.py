@@ -63,13 +63,21 @@ def send_to_group(message: str, group_name: str | None = None) -> tuple[bool, st
             if not page.url.startswith("https://web.whatsapp.com"):
                 page.goto("https://web.whatsapp.com/", wait_until="domcontentloaded", timeout=60000)
 
-            # Mantém a janela aberta; se pedir QR, o usuário pode escanear uma única vez.
+            # Aguarda pelo estado real da página: o WhatsApp muda seus seletores com frequência.
+            # A busca pode ser um input ou um elemento contenteditable, conforme a versão da interface.
             try:
-                page.locator(
-                    'div[contenteditable="true"], canvas[aria-label*="Scan"], '
-                    'canvas[aria-label*="QR"], [data-testid="qrcode"], '
-                    'text="Use o WhatsApp no seu celular para escanear o código QR"'
-                ).first.wait_for(timeout=45000)
+                page.locator("body").wait_for(state="visible", timeout=15000)
+                page.wait_for_function(
+                    """() => {
+                        const text = (document.body?.innerText || '').toLowerCase();
+                        return text.includes('pesquisar ou começar uma nova conversa')
+                            || text.includes('search or start new chat')
+                            || text.includes('escaneie o código qr')
+                            || text.includes('scan the qr code')
+                            || !!document.querySelector('canvas[aria-label*="QR"], [data-testid="qrcode"]');
+                    }""",
+                    timeout=45000
+                )
             except Exception:
                 try:
                     Path("data").mkdir(parents=True, exist_ok=True)
@@ -78,17 +86,19 @@ def send_to_group(message: str, group_name: str | None = None) -> tuple[bool, st
                     pass
                 _last_failure_at = time.monotonic()
                 _last_failure_message = (
-                    "WhatsApp Web não carregou em 45 segundos. A janela foi mantida aberta; "
-                    "confira a janela do navegador e data/whatsapp_load_error.png."
+                    "WhatsApp Web abriu, mas não mostrou a lista de conversas nem a autenticação. "
+                    "A janela foi mantida aberta; veja data/whatsapp_load_error.png."
                 )
                 return False, _last_failure_message
 
-            editable = page.locator('div[contenteditable="true"]')
-            if editable.count() == 0:
+            body_text = (page.locator("body").inner_text(timeout=10000) or "").casefold()
+            if ("qr code" in body_text or "código qr" in body_text) and (
+                "pesquisar ou começar" not in body_text and "search or start new chat" not in body_text
+            ):
                 _last_failure_at = time.monotonic()
                 _last_failure_message = (
-                    "WhatsApp Web está pedindo autenticação. Escaneie o QR Code na janela do navegador; "
-                    "ela ficará aberta para manter a sessão."
+                    "WhatsApp Web está pedindo autenticação. Escaneie o QR Code nesta janela; "
+                    "a sessão será reutilizada nas próximas mensagens."
                 )
                 return False, _last_failure_message
 
