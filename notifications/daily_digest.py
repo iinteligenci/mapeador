@@ -1,6 +1,7 @@
 """Rotina diária de notificações para o grupo WhatsApp privado 'lembrar'."""
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
@@ -46,6 +47,80 @@ def _init_log() -> None:
                 completed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS notification_schedule_settings (
+                id INTEGER PRIMARY KEY CHECK (id=1),
+                enabled INTEGER NOT NULL DEFAULT 1,
+                times_json TEXT NOT NULL DEFAULT '["09:00"]',
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.execute("INSERT OR IGNORE INTO notification_schedule_settings(id, enabled, times_json) VALUES (1, 1, '[\"09:00\"]')")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS notification_schedule_runs (
+                run_date TEXT NOT NULL,
+                scheduled_time TEXT NOT NULL,
+                completed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY(run_date, scheduled_time)
+            )
+        """)
+
+
+
+def get_notification_schedule() -> dict:
+    _init_log()
+    with _connect() as conn:
+        row = conn.execute("SELECT enabled, times_json FROM notification_schedule_settings WHERE id=1").fetchone()
+    try:
+        times = json.loads(row["times_json"]) if row else ["09:00"]
+    except (TypeError, json.JSONDecodeError):
+        times = ["09:00"]
+    return {"enabled": bool(row["enabled"]) if row else True, "times": times}
+
+
+def set_notification_schedule(enabled: bool, times_text: str) -> list[str]:
+    """Salva horários HH:MM separados por vírgula."""
+    values = []
+    for item in str(times_text or "").replace(";", ",").split(","):
+        item = item.strip()
+        if not item:
+            continue
+        if not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", item):
+            raise ValueError(f"Horário inválido: {item}. Use HH:MM, por exemplo 09:00.")
+        if item not in values:
+            values.append(item)
+    if not values:
+        raise ValueError("Digite pelo menos um horário, por exemplo 09:00.")
+    values.sort()
+    _init_log()
+    with _connect() as conn:
+        conn.execute("UPDATE notification_schedule_settings SET enabled=?, times_json=?, updated_at=CURRENT_TIMESTAMP WHERE id=1",
+                     (int(enabled), json.dumps(values)))
+    return values
+
+
+def _schedule_run_done(today: str, scheduled_time: str) -> bool:
+    with _connect() as conn:
+        return conn.execute("SELECT 1 FROM notification_schedule_runs WHERE run_date=? AND scheduled_time=?",
+                            (today, scheduled_time)).fetchone() is not None
+
+
+def _mark_schedule_run(today: str, scheduled_time: str) -> None:
+    with _connect() as conn:
+        conn.execute("INSERT OR IGNORE INTO notification_schedule_runs(run_date, scheduled_time) VALUES (?, ?)",
+                     (today, scheduled_time))
+
+
+def run_scheduled_notifications() -> tuple[bool, str]:
+    """Verifica itens novos em cada horário configurado, sem repetir os já enviados."""
+    _init_log()
+    today = datetime.now().astimezone().date().isoformat()
+    ok_routes = _send_routes(today)
+    _ensure_proposals(limit=15)
+    count_4k, ok_4k = _send_proposals("4k", today, 5)
+    count_digital, ok_digital = _send_proposals("digital", today, 5)
+    return (ok_routes and ok_4k and ok_digital,
+            f"{count_4k} propostas 4K e {count_digital} propostas de presença digital enviadas; rotas elegíveis verificadas.")
 
 
 def _was_sent(event_key: str) -> bool:
@@ -389,25 +464,21 @@ def run_daily_notifications() -> tuple[bool, str]:
 
 
 def daily_notifications_loop() -> None:
-    """Executa uma vez por dia após o horário configurado (padrão 09:00, horário local)."""
+    """Verifica horários configurados e executa cada horário no máximo uma vez por dia."""
     _init_log()
     while True:
         try:
             now = datetime.now().astimezone()
             today = now.date().isoformat()
-            target = os.getenv("WHATSAPP_DAILY_TIME", "09:00").strip()
-            try:
-                hour, minute = (int(part) for part in target.split(":", 1))
-                due = (now.hour, now.minute) >= (hour, minute)
-            except Exception:
-                due = (now.hour, now.minute) >= (9, 0)
-            if due and not _daily_complete(today):
-                ok, detail = run_daily_notifications()
-                logging.info("Mapeador — notificações diárias: %s", detail)
-                if not ok:
-                    logging.warning("Algumas notificações falharam; o worker tentará novamente em 15 minutos.")
-                    time.sleep(900)
-                    continue
+            schedule = get_notification_schedule()
+            current_time = now.strftime("%H:%M")
+            if schedule["enabled"] and current_time in schedule["times"] and not _schedule_run_done(today, current_time):
+                ok, detail = run_scheduled_notifications()
+                logging.info("Mapeador — notificações WhatsApp (%s): %s", current_time, detail)
+                if ok:
+                    _mark_schedule_run(today, current_time)
+                else:
+                    logging.warning("Algumas notificações falharam; o horário será tentado novamente.")
         except Exception as exc:
-            logging.warning("Erro na rotina diária de notificações: %s", exc)
-        time.sleep(30)
+            logging.warning("Erro na rotina de notificações: %s", exc)
+        time.sleep(20)
