@@ -22,7 +22,7 @@ from scraper.maps_scraper import search_google_maps, fetch_place_address
 from scraper.public_contacts import find_public_business_contacts
 from scraper.site_research import research_public_site
 from notifications.whatsapp_self import send_to_self
-from notifications.daily_digest import daily_notifications_loop, send_eligible_routes_now, _neighborhood, get_notification_schedule, set_notification_schedule
+from notifications.daily_digest import daily_notifications_loop, send_eligible_routes_now, run_proposals_now, _neighborhood, get_notification_schedule, set_notification_schedule
 
 load_dotenv()
 
@@ -1680,6 +1680,7 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
 <button type="submit">Salvar ativação</button>
 </form>
 <form method="post" action="/notifications/test"><p class="muted">Teste manual de conexão com o grupo WhatsApp configurado.</p><button type="submit">Testar envio para o WhatsApp agora</button></form>
+<form method="post" action="/notifications/run-now"><p class="muted">Analisa o banco salvo, tenta preparar propostas e envia até uma proposta pendente de cada perfil. Mostra quantas têm e-mail e WhatsApp públicos e quantas ainda estão pendentes.</p><button type="submit">Analisar banco e enviar propostas agora</button></form>
 </section>
 <section class="panel"><h2>Pesquisa e enriquecimento automáticos</h2><p class="muted">Este controle é independente do WhatsApp. Desligue-o para parar novas pesquisas e coleta de dados; os envios pelo WhatsApp podem continuar usando o banco já preenchido.</p><p><strong>Status:</strong> <span style="color:{{ '#35d49a' if settings.enabled else '#ffcc80' }};font-weight:800">{{ 'LIGADO' if settings.enabled else 'DESLIGADO' }}</span></p>
 <form method="post" action="/automatic/toggle" style="display:flex;gap:10px;flex-wrap:wrap">
@@ -1931,6 +1932,18 @@ def test_whatsapp_notification():
     ok, detail = send_to_self(test_message)
     prefix = "OK: " if ok else "ERRO: "
     return redirect(url_for("automatic_mode", message=prefix + detail))
+
+
+@app.post("/notifications/run-now")
+def run_proposals_now_route():
+    """Executa um ciclo imediato de análise/envio e apresenta diagnóstico de elegibilidade."""
+    try:
+        ok, detail = run_proposals_now()
+        prefix = "OK: " if ok else "ATENÇÃO: "
+        return redirect(url_for("automatic_mode", message=prefix + detail))
+    except Exception as exc:
+        app.logger.exception("Falha ao executar propostas imediatas")
+        return redirect(url_for("automatic_mode", message=f"ERRO: {type(exc).__name__}: {exc}"))
 
 
 @app.post("/notifications/schedule")
