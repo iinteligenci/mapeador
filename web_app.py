@@ -2158,116 +2158,117 @@ def _background_research_loop() -> None:
                 except Exception as exc:
                     print(f"Mapeador automático — pesquisa aprofundada: {type(exc).__name__}: {exc}")
 
-                # Refresh records and continuously drain every due enrichment task.
-                records = get_leads(path=db_path)
-                processed = 0
-                for saved in records:
-                    if saved.get("status") in {"removed", "in_person"} or _is_distributor(saved):
-                        continue
-                    checked_text = saved.get("contact_checked_at") or ""
-                    try:
-                        checked_at = datetime.fromisoformat(checked_text) if checked_text else None
-                    except (ValueError, TypeError):
-                        checked_at = None
-                    # Retry weekly while any useful channel remains missing; preserve prior public data.
-                    contacts_incomplete = not (
-                        (saved.get("contact_whatsapp") or saved.get("contact_whatsapps"))
-                        and (saved.get("contact_emails"))
-                    )
-                    contacts_due = checked_at is None or (
-                        contacts_incomplete and checked_at < datetime.now() - timedelta(days=7)
-                    )
-                    if not contacts_due:
-                        continue
-                    # Count attempts, not only successes, so failures do not block later records.
-                    processed += 1
-                    activity = True
-                    try:
-                        # AI-assisted web research runs before the site scraper, helping discover
-                        # official pages and public contact channels missed by Maps/site-only parsing.
-                        ai_research = enrich_business_with_ai(saved)
-                        lead_for_contacts = {
+            # Enriquecimento independente: continua mesmo com novas pesquisas desligadas.
+            # Refresh records and continuously drain every due enrichment task.
+            records = get_leads(path=db_path)
+            processed = 0
+            for saved in records:
+                if saved.get("status") in {"removed", "in_person"} or _is_distributor(saved):
+                    continue
+                checked_text = saved.get("contact_checked_at") or ""
+                try:
+                    checked_at = datetime.fromisoformat(checked_text) if checked_text else None
+                except (ValueError, TypeError):
+                    checked_at = None
+                # Retry weekly while any useful channel remains missing; preserve prior public data.
+                contacts_incomplete = not (
+                    (saved.get("contact_whatsapp") or saved.get("contact_whatsapps"))
+                    and (saved.get("contact_emails"))
+                )
+                contacts_due = checked_at is None or (
+                    contacts_incomplete and checked_at < datetime.now() - timedelta(days=7)
+                )
+                if not contacts_due:
+                    continue
+                # Count attempts, not only successes, so failures do not block later records.
+                processed += 1
+                activity = True
+                try:
+                    # AI-assisted web research runs before the site scraper, helping discover
+                    # official pages and public contact channels missed by Maps/site-only parsing.
+                    ai_research = enrich_business_with_ai(saved)
+                    lead_for_contacts = {
+                        **saved,
+                        "website": saved.get("website") or ai_research.get("website", ""),
+                    }
+                    contacts = find_public_business_contacts(lead_for_contacts)
+                    # Merge only sourced, publicly discovered AI results; keep prior values.
+                    contacts["contact_emails"] = list(dict.fromkeys(
+                        list(contacts.get("contact_emails") or []) + list(ai_research.get("emails") or [])
+                    ))
+                    contacts["contact_phones"] = list(dict.fromkeys(
+                        list(contacts.get("contact_phones") or []) + list(ai_research.get("phones") or [])
+                    ))
+                    contacts["contact_whatsapps"] = list(dict.fromkeys(
+                        list(contacts.get("contact_whatsapps") or []) + list(ai_research.get("whatsapps") or [])
+                    ))
+                    if not contacts.get("contact_email") and contacts["contact_emails"]:
+                        contacts["contact_email"] = contacts["contact_emails"][0]
+                    if not contacts.get("contact_whatsapp") and contacts["contact_whatsapps"]:
+                        contacts["contact_whatsapp"] = contacts["contact_whatsapps"][0]
+                    if not contacts.get("contact_phone") and contacts["contact_phones"]:
+                        contacts["contact_phone"] = contacts["contact_phones"][0]
+                    contacts["contact_sources"] = list(dict.fromkeys(
+                        list(contacts.get("contact_sources") or []) + list(ai_research.get("sources") or [])
+                    ))
+                    if ai_research.get("website") and not saved.get("website"):
+                        saved["website"] = ai_research["website"]
+                    update_public_contacts(int(saved["id"]), contacts, db_path)
+                    update_business_identity(int(saved["id"]), contacts.get("cnpj", ""),
+                                             contacts.get("cnpj_source", ""), db_path)
+                    research = research_public_site({
+                        **saved,
+                        "website": saved.get("website") or ai_research.get("website", ""),
+                        "menu_url": ai_research.get("menu_url") or saved.get("menu_url", ""),
+                    })
+                    if ai_research.get("instagram") and not research.get("instagram"):
+                        research["instagram"] = ai_research["instagram"]
+                    if ai_research.get("menu_url") and not research.get("menu_url"):
+                        research["menu_url"] = ai_research["menu_url"]
+                    if ai_research.get("notes"):
+                        research.setdefault("research_notes", []).extend(ai_research["notes"])
+                    if ai_research.get("sources"):
+                        research.setdefault("sources", []).extend(ai_research["sources"])
+                    endpoints = []
+                    for value in contacts.get("contact_whatsapps", []):
+                        endpoints.append(("WhatsApp", value, next(iter(contacts.get("contact_sources", [])), contacts.get("contact_source", ""))))
+                    for value in contacts.get("contact_phones", []):
+                        endpoints.append(("Telefone", value, contacts.get("contact_source", "")))
+                    for value in contacts.get("contact_emails", []):
+                        endpoints.append(("E-mail", value, contacts.get("contact_source", "")))
+                    # Fallback to the public business number from Maps if the site has no channels.
+                    if not endpoints:
+                        raw = contacts.get("contact_whatsapp") or contacts.get("contact_phone") or saved.get("phone") or ""
+                        if raw:
+                            endpoints.append(("Telefone comercial", raw, contacts.get("contact_source") or saved.get("link", "")))
+                    if endpoints:
+                        lead_for_ai = {
                             **saved,
-                            "website": saved.get("website") or ai_research.get("website", ""),
+                            "address": saved.get("address", ""),
+                            "instagram": research.get("instagram", ""),
+                            "channels": research.get("channels", []),
+                            "menu_url": research.get("menu_url", ""),
+                            "menu_items": research.get("menu_items", []),
+                            "public_platforms": research.get("public_platforms", []),
+                            "research_notes": research.get("research_notes", []),
                         }
-                        contacts = find_public_business_contacts(lead_for_contacts)
-                        # Merge only sourced, publicly discovered AI results; keep prior values.
-                        contacts["contact_emails"] = list(dict.fromkeys(
-                            list(contacts.get("contact_emails") or []) + list(ai_research.get("emails") or [])
-                        ))
-                        contacts["contact_phones"] = list(dict.fromkeys(
-                            list(contacts.get("contact_phones") or []) + list(ai_research.get("phones") or [])
-                        ))
-                        contacts["contact_whatsapps"] = list(dict.fromkeys(
-                            list(contacts.get("contact_whatsapps") or []) + list(ai_research.get("whatsapps") or [])
-                        ))
-                        if not contacts.get("contact_email") and contacts["contact_emails"]:
-                            contacts["contact_email"] = contacts["contact_emails"][0]
-                        if not contacts.get("contact_whatsapp") and contacts["contact_whatsapps"]:
-                            contacts["contact_whatsapp"] = contacts["contact_whatsapps"][0]
-                        if not contacts.get("contact_phone") and contacts["contact_phones"]:
-                            contacts["contact_phone"] = contacts["contact_phones"][0]
-                        contacts["contact_sources"] = list(dict.fromkeys(
-                            list(contacts.get("contact_sources") or []) + list(ai_research.get("sources") or [])
-                        ))
-                        if ai_research.get("website") and not saved.get("website"):
-                            saved["website"] = ai_research["website"]
-                        update_public_contacts(int(saved["id"]), contacts, db_path)
-                        update_business_identity(int(saved["id"]), contacts.get("cnpj", ""),
-                                                 contacts.get("cnpj_source", ""), db_path)
-                        research = research_public_site({
-                            **saved,
-                            "website": saved.get("website") or ai_research.get("website", ""),
-                            "menu_url": ai_research.get("menu_url") or saved.get("menu_url", ""),
-                        })
-                        if ai_research.get("instagram") and not research.get("instagram"):
-                            research["instagram"] = ai_research["instagram"]
-                        if ai_research.get("menu_url") and not research.get("menu_url"):
-                            research["menu_url"] = ai_research["menu_url"]
-                        if ai_research.get("notes"):
-                            research.setdefault("research_notes", []).extend(ai_research["notes"])
-                        if ai_research.get("sources"):
-                            research.setdefault("sources", []).extend(ai_research["sources"])
-                        endpoints = []
-                        for value in contacts.get("contact_whatsapps", []):
-                            endpoints.append(("WhatsApp", value, next(iter(contacts.get("contact_sources", [])), contacts.get("contact_source", ""))))
-                        for value in contacts.get("contact_phones", []):
-                            endpoints.append(("Telefone", value, contacts.get("contact_source", "")))
-                        for value in contacts.get("contact_emails", []):
-                            endpoints.append(("E-mail", value, contacts.get("contact_source", "")))
-                        # Fallback to the public business number from Maps if the site has no channels.
-                        if not endpoints:
-                            raw = contacts.get("contact_whatsapp") or contacts.get("contact_phone") or saved.get("phone") or ""
-                            if raw:
-                                endpoints.append(("Telefone comercial", raw, contacts.get("contact_source") or saved.get("link", "")))
-                        if endpoints:
-                            lead_for_ai = {
-                                **saved,
-                                "address": saved.get("address", ""),
-                                "instagram": research.get("instagram", ""),
-                                "channels": research.get("channels", []),
-                                "menu_url": research.get("menu_url", ""),
-                                "menu_items": research.get("menu_items", []),
-                                "public_platforms": research.get("public_platforms", []),
-                                "research_notes": research.get("research_notes", []),
-                            }
-                            profiles_to_analyze = ["4k", "digital"] if _is_4k_target(saved) else ["digital"]
-                            analyses = analyze_lead_profiles(lead_for_ai, profiles_to_analyze)
-                            for profile_key, analysis in analyses.items():
-                                for contact_type, contact_value, source_url in endpoints:
-                                    save_proposal(int(saved["id"]), profile_key, contact_type,
-                                                  contact_value, source_url, analysis, db_path)
-                            combined = {
-                                "score": max(a["score"] for a in analyses.values()),
-                                "justificativa": "\n".join(a["justificativa"] for a in analyses.values()),
-                                "mensagem": "\n\n".join(
-                                    ("4K Food Service" if key == "4k" else "Presença digital") + ":\n" + value["mensagem"]
-                                    for key, value in analyses.items()),
-                            }
-                            update_analysis(int(saved["id"]), combined, db_path)
-                    except Exception as exc:
-                        print(f"Mapeador automático — {saved.get('name','estabelecimento')}: {type(exc).__name__}: {exc}")
-                    # No per-cycle cap: continue to the next due establishment immediately.
+                        profiles_to_analyze = ["4k", "digital"] if _is_4k_target(saved) else ["digital"]
+                        analyses = analyze_lead_profiles(lead_for_ai, profiles_to_analyze)
+                        for profile_key, analysis in analyses.items():
+                            for contact_type, contact_value, source_url in endpoints:
+                                save_proposal(int(saved["id"]), profile_key, contact_type,
+                                              contact_value, source_url, analysis, db_path)
+                        combined = {
+                            "score": max(a["score"] for a in analyses.values()),
+                            "justificativa": "\n".join(a["justificativa"] for a in analyses.values()),
+                            "mensagem": "\n\n".join(
+                                ("4K Food Service" if key == "4k" else "Presença digital") + ":\n" + value["mensagem"]
+                                for key, value in analyses.items()),
+                        }
+                        update_analysis(int(saved["id"]), combined, db_path)
+                except Exception as exc:
+                    print(f"Mapeador automático — {saved.get('name','estabelecimento')}: {type(exc).__name__}: {exc}")
+                # No per-cycle cap: continue to the next due establishment immediately.
         except Exception as exc:
             print(f"Mapeador automático — erro do ciclo: {type(exc).__name__}: {exc}")
         # Keep working continuously when there is work; back off only while idle or after errors.
