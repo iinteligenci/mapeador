@@ -96,13 +96,31 @@ Para iniciar no Windows, atualize com GitHub Desktop (Fetch origin e Pull origin
 A busca depende do carregamento de resultados do Google Maps e pode encontrar menos negócios que o solicitado se o Maps não apresentar mais resultados. A aplicação não contorna bloqueios e não envia mensagens automaticamente.
 
 
-## Notificações no seu próprio WhatsApp
+## Notificações diárias no grupo WhatsApp "lembrar"
 
-O Mapeador pode avisar o proprietário no próprio WhatsApp quando uma busca encontra empresas novas, quando uma proposta é gerada e quando o usuário solicita o envio do resumo das rotas por bairro. **Essas notificações são apenas para o número configurado do proprietário; o sistema não dispara mensagens para os estabelecimentos.**
+O Mapeador pode enviar notificações para o grupo privado chamado `lembrar`, uma mensagem por item. **As notificações são enviadas ao grupo do proprietário, não aos estabelecimentos.**
 
-1. No arquivo local `.env`, configure `WHATSAPP_SELF_NUMBER` com o número do próprio usuário em formato internacional e somente dígitos (ex.: `55DDDNUMERO`) e `WHATSAPP_NOTIFICATIONS=true`.
-2. Execute `py web_app.py`. Na primeira notificação, o Mapeador abrirá uma janela própria do Chromium. Escaneie o QR Code do WhatsApp Web se solicitado. A sessão fica salva em `data/whatsapp_profile`.
-3. Nas próximas notificações, o Mapeador tentará enviar o resumo automaticamente para esse número. Para rotas, abra a aba Rotas e clique em **Enviar resumo das rotas para meu WhatsApp**.
-4. Mantenha o computador ligado e o app local executando. Não publique nem compartilhe a pasta `data/whatsapp_profile`; ela contém a sessão autenticada.
+- **Rotas:** a partir das 09:00 (horário local, configurável), envia uma mensagem por bairro com mais de 10 visitas presenciais, incluindo endereço e link do Google Maps. Cada bairro é registrado após envio e não é repetido.
+- **Propostas 4K:** envia até cinco mensagens individuais por dia, uma por empresa, claramente identificadas como `PROPOSTA — 4K FOOD SERVICE`.
+- **Presença digital:** envia até cinco mensagens individuais por dia, uma por empresa, claramente identificadas como `PROPOSTA — PRESENÇA DIGITAL`.
+- Cada proposta exige e-mail e número de WhatsApp encontrados em fontes públicas. Se não houver cinco propostas elegíveis, não inventa dados nem reenvia propostas já notificadas.
+- As mensagens de proposta incluem os contatos, o endereço, o link do Maps, a prioridade estimada e o texto sugerido. O texto comercial é apenas um rascunho; nada é enviado aos estabelecimentos.
 
-A automação usa a interface do WhatsApp Web, que pode mudar e não é uma integração oficial. Pode exigir novo login ou falhar. Use apenas para notificações próprias; não automatize disparos para empresas. Se quiser desativar, defina `WHATSAPP_NOTIFICATIONS=false`.
+### Configuração local
+
+No arquivo `.env`, configure:
+
+```dotenv
+WHATSAPP_GROUP_NAME=lembrar
+WHATSAPP_NOTIFICATIONS=true
+WHATSAPP_DAILY_TIME=09:00
+WHATSAPP_PROFILE_DIR=data/whatsapp_profile
+```
+
+1. Atualize o projeto com GitHub Desktop (Fetch origin e Pull origin).
+2. Execute `py web_app.py`.
+3. Na primeira execução, o Chromium abrirá o WhatsApp Web. Escaneie o QR Code se solicitado e confirme que existe um grupo com o nome exato `lembrar`.
+4. Mantenha o computador ligado, a sessão do WhatsApp conectada e o Mapeador em execução. A rotina diária começa no horário configurado.
+5. A pasta `data/whatsapp_profile` contém a sessão autenticada: não a publique nem compartilhe.
+
+A automação utiliza a interface do WhatsApp Web, não uma API oficial. A interface pode mudar, exigir novo login ou falhar. Os envios individuais são registrados no banco SQLite para reduzir duplicações. Para desativar as notificações, use `WHATSAPP_NOTIFICATIONS=false`.
