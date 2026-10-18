@@ -7,10 +7,13 @@ import re
 from pathlib import Path
 from threading import Lock
 from urllib.parse import quote
+import time
 
 from playwright.sync_api import sync_playwright
 
 _lock = Lock()
+_last_failure_at = 0.0
+_last_failure_message = ""
 
 
 def _open_context(playwright):
@@ -33,6 +36,10 @@ def send_to_group(message: str, group_name: str | None = None) -> tuple[bool, st
         return False, "Notificações WhatsApp desativadas."
     if not group:
         return False, "Configure WHATSAPP_GROUP_NAME no .env."
+
+    global _last_failure_at, _last_failure_message
+    if _last_failure_at and time.monotonic() - _last_failure_at < 300:
+        return False, _last_failure_message or "WhatsApp indisponível; aguardando antes de tentar novamente."
 
     with _lock:
         try:
@@ -83,7 +90,9 @@ def send_to_group(message: str, group_name: str | None = None) -> tuple[bool, st
                     context.close()
         except Exception as exc:
             logging.warning("Falha ao enviar notificação para grupo WhatsApp: %s", exc)
-            return False, f"Falha no WhatsApp Web ({type(exc).__name__}); confira a sessão e o nome do grupo."
+            _last_failure_at = time.monotonic()
+            _last_failure_message = f"Falha no WhatsApp Web ({type(exc).__name__}); confira a sessão e o nome do grupo."
+            return False, _last_failure_message
 
 
 def send_to_self(message: str) -> tuple[bool, str]:
