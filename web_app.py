@@ -485,7 +485,13 @@ def search():
             raise ValueError("Distribuidoras são pesquisadas exclusivamente na aba Distribuidoras.")
         known_links = {str(item.get("link") or "").split("?")[0].rstrip("/") for item in get_leads(path=db_path)}
         raw_leads = asyncio.run(search_google_maps(term, min(60, limit * 5), exclude_links=known_links))
-        leads = _filter_food_results(raw_leads, term)[:limit]
+        # A pesquisa registra os resultados novos do Maps; categoria e dados de contato
+        # definem a elegibilidade comercial depois, nunca o salvamento no histórico.
+        # Distribuidoras continuam na aba própria e são excluídas deste fluxo.
+        leads = [
+            lead for lead in raw_leads
+            if not _is_distributor(lead)
+        ][:limit]
     except Exception as exc:
         return render_template_string(
             PAGE, term=term, limit=limit, offer=offer, profile=profile, reanalyze=reanalyze, results=[],
@@ -2131,8 +2137,11 @@ def _background_research_loop() -> None:
                         try:
                             raw_found = asyncio.run(search_google_maps(
                                 query, min(60, max(10, (batch_size - found_count) * 5)), exclude_links=known_links))
-                            found = _filter_food_results(raw_found, query)
-                            print(f"Mapeador automático — {len(found)} resultado(s) elegível(is) após filtro de município e tipo.")
+                            # A consulta já especifica a cidade e o tipo de negócio.
+                            # Não descartar resultados por falta de endereço ou por categoria:
+                            # salvar primeiro; a elegibilidade de proposta é decidida depois.
+                            found = [item for item in raw_found if not _is_distributor(item)]
+                            print(f"Mapeador automático — {len(found)} resultado(s) novo(s) candidato(s) para registro; elegibilidade comercial será avaliada depois.")
                             for new_lead in found:
                                 normalized = str(new_lead.get("link") or "").split("?")[0].rstrip("/")
                                 if not normalized or normalized in known_links:
