@@ -21,6 +21,7 @@ from database.db import (get_leads, init_db, save_lead, update_analysis, update_
 from scraper.maps_scraper import search_google_maps, fetch_place_address
 from scraper.public_contacts import find_public_business_contacts
 from scraper.site_research import research_public_site
+from notifications.whatsapp_self import send_to_self
 
 load_dotenv()
 app = Flask(__name__)
@@ -366,6 +367,17 @@ def search():
             "error": None,
         })
 
+    if results:
+        names = [str(item["lead"].get("name") or "Empresa") for item in results[:12]]
+        summary = f"🗺️ MAPEADOR — {len(results)} nova(s) empresa(s) encontrada(s)\nPesquisa: {term}\n\n"
+        summary += "\n".join(f"• {name}" for name in names)
+        if len(results) > len(names):
+            summary += f"\n… e mais {len(results) - len(names)} empresa(s)."
+        summary += "\n\nAbra o Mapeador no computador para ver contatos e gerar propostas."
+        ok, detail = send_to_self(summary)
+        if not ok:
+            app.logger.info("Notificação de novas empresas não enviada: %s", detail)
+
     return render_template_string(
         PAGE, term=term, limit=limit, offer=offer, profile=profile, reanalyze=reanalyze, results=results,
         analyzed=0, failed=0, skipped=skipped, error=None
@@ -532,6 +544,15 @@ def generate_proposal():
         error = f"Não foi possível gerar a proposta ({type(exc).__name__}: {exc}). Os dados do estabelecimento continuam salvos."
 
     item = {"lead": lead, "lead_id": lead_id, "research": research, "analyses": analyses, "error": error}
+    if analyses:
+        lines = [f"🧾 MAPEADOR — proposta gerada", f"Empresa: {lead.get('name')}", ""]
+        for key, analysis in analyses.items():
+            label = "4K Food Service" if key == "4k" else "Presença digital"
+            lines.extend([f"{label} (prioridade {analysis.get('score', '?')}/100):", str(analysis.get("mensagem") or ""), ""])
+        lines.append("A proposta foi gerada como rascunho; nenhuma mensagem foi enviada à empresa.")
+        ok, detail = send_to_self("\n".join(lines)[:3500])
+        if not ok:
+            app.logger.info("Notificação de proposta não enviada: %s", detail)
     try:
         page_limit = max(1, min(15, int(request.form.get("limit", "3") or "3")))
     except ValueError:
@@ -680,7 +701,19 @@ def routes():
         group["share_url"] = "https://wa.me/?text=" + quote("\\n".join(group_lines))
     all_share_url = "https://wa.me/?text=" + quote("\\n".join(all_lines))
     message = request.args.get("message", "")
-    return render_template_string(ROUTES_PAGE, groups=groups, total=len(leads), message=message, all_share_url=all_share_url)
+    return render_template_string(
+        ROUTES_PAGE, groups=groups, total=len(leads), message=message,
+        all_share_url=all_share_url, all_lines_text="\n".join(all_lines)
+    )
+
+
+@app.post("/routes/notify")
+def notify_routes_to_self():
+    message = (request.form.get("message") or "").strip()
+    if not message:
+        return "Não há rotas para enviar.", 400
+    ok, detail = send_to_self("📍 " + message[:3500])
+    return redirect(url_for("routes", message=("WhatsApp: " + detail)))
 
 
 @app.post("/routes/refresh-addresses")
@@ -1064,6 +1097,10 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
 <section class="panel"><h2>{{ total }} estabelecimento(s) para visitar · {{ groups|length }} bairro(s)</h2>
 <p class="muted">Prepare um resumo para enviar pelo WhatsApp. Você escolhe a conversa e confirma o envio; nenhuma mensagem é disparada sozinha.</p>
 <p><a class="btn" href="{{ all_share_url }}" target="_blank" rel="noopener">Compartilhar todas as rotas no WhatsApp</a></p>
+<form method="post" action="{{ url_for('notify_routes_to_self') }}">
+<input type="hidden" name="message" value="{{ all_lines_text }}">
+<button type="submit">Enviar resumo das rotas para meu WhatsApp</button>
+</form>
 <form method="post" action="/routes/refresh-addresses"><button type="submit" style="background:#4da3ff;color:#071321;border:0;border-radius:9px;padding:11px 15px;font-weight:700;cursor:pointer">Buscar endereços diretamente no Google Maps</button></form>
 {% if message %}<p class="muted">{{ message }}</p>{% endif %}
 {% if not groups %}<div class="empty">Nenhum estabelecimento está marcado para visita presencial. No histórico, altere a etapa de um estabelecimento para “Visita presencial” para ele aparecer aqui.</div>{% endif %}
