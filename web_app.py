@@ -1715,8 +1715,8 @@ def _persist_whatsapp_notifications(enabled: bool) -> None:
             break
     if not updated:
         lines.append(f"WHATSAPP_NOTIFICATIONS={value}")
-    with open(env_path, "w", encoding="utf-8", newline="\\n") as handle:
-        handle.write("\\n".join(lines).rstrip() + "\\n")
+    with open(env_path, "w", encoding="utf-8", newline="\n") as handle:
+        handle.write("\n".join(lines).rstrip() + "\n")
 
 
 @app.post("/notifications/schedule")
