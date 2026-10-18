@@ -75,7 +75,7 @@ def send_to_group(message: str, group_name: str | None = None) -> tuple[bool, st
 
                     composer = page.locator('footer div[contenteditable="true"]').last
                     composer.wait_for(timeout=15000)
-                    composer.fill(message[:3500])
+                    composer.fill(message[:10000])
                     composer.press("Enter")
                     page.wait_for_timeout(1000)
                     return True, f"Mensagem enviada ao grupo '{group}'."
