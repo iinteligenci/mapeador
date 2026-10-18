@@ -3,11 +3,9 @@ from __future__ import annotations
 
 import logging
 import os
-import re
+import time
 from pathlib import Path
 from threading import Lock
-from urllib.parse import quote
-import time
 
 from playwright.sync_api import sync_playwright
 
@@ -43,27 +41,137 @@ def _get_whatsapp_page():
     return _page
 
 
+def _visible_first(candidates):
+    for candidate in candidates:
+        try:
+            if candidate.count() and candidate.first.is_visible():
+                return candidate.first
+        except Exception:
+            continue
+    return None
+
+
 def _read_current_chat_header(page) -> str:
-    """Lê o cabeçalho da conversa sem depender de um único seletor do WhatsApp."""
+    """Lê somente o cabeçalho do painel da conversa, tolerando mudanças no DOM."""
+    selectors = [
+        '[data-testid="conversation-header"]',
+        '[data-testid="conversation-panel-wrapper"] header',
+        '#main header',
+        'header',
+    ]
+    for selector in selectors:
+        try:
+            nodes = page.locator(selector)
+            for index in range(min(nodes.count(), 4)):
+                value = nodes.nth(index).inner_text(timeout=1500).strip()
+                if value:
+                    return value.casefold()
+        except Exception:
+            continue
+    return ""
+
+
+def _save_diagnostic(page, exc) -> str:
     try:
-        specific = page.locator('[data-testid="conversation-header"]')
-        if specific.count():
-            value = specific.first.inner_text(timeout=2500).strip()
-            if value:
-                return value.casefold()
-    except Exception:
-        pass
+        Path("data").mkdir(parents=True, exist_ok=True)
+        page.screenshot(path="data/whatsapp_load_error.png", full_page=True)
+        body = (page.locator("body").inner_text(timeout=2500) or "")[:700].replace("\n", " ")
+        detail = (
+            f"url={page.url}\ntitle={page.title()}\n"
+            f"error={type(exc).__name__}: {exc}\nbody={body}"
+        )
+        Path("data/whatsapp_load_error.txt").write_text(detail, encoding="utf-8")
+        return detail
+    except Exception as diag_exc:
+        return f"diagnóstico indisponível: {type(diag_exc).__name__}: {diag_exc}"
+
+
+def _find_search_box(page):
+    return _visible_first([
+        page.locator('[data-testid="chat-list-search"]'),
+        page.locator('div[contenteditable="true"][data-tab="3"]'),
+        page.locator('div[contenteditable="true"][aria-label*="Pesquisar"]'),
+        page.locator('div[contenteditable="true"][aria-label*="Search"]'),
+        page.locator('[role="textbox"][contenteditable="true"][data-tab="3"]'),
+        page.locator('button[aria-label*="Pesquisar"]'),
+        page.locator('button[aria-label*="Search"]'),
+    ])
+
+
+def _open_target_group(page, group: str) -> tuple[bool, str]:
+    current_header = _read_current_chat_header(page)
+    if group.casefold() in current_header:
+        return True, ""
+
+    search = _find_search_box(page)
+    if search is None:
+        return False, "WhatsApp abriu, mas não encontrei a pesquisa de conversas."
+
     try:
-        headers = page.locator("header").all_inner_texts()
-        # Cabeçalhos incluem o painel lateral e a conversa; juntar textos evita
-        # strict-mode e tolera mudanças no DOM entre versões do WhatsApp.
-        return " ".join(value.strip() for value in headers if value.strip()).casefold()
-    except Exception:
-        return ""
+        search.click(timeout=8000)
+        try:
+            search.fill(group, timeout=5000)
+        except Exception:
+            search.press("Control+A")
+            search.type(group, delay=60)
+        page.wait_for_timeout(1800)
+
+        # Prioriza o painel lateral para não clicar em texto de outra área da página.
+        result_candidates = [
+            page.locator('#pane-side').get_by_text(group, exact=True),
+            page.locator('[data-testid="chat-list"]').get_by_text(group, exact=True),
+            page.locator('[data-testid="chatlist"]').get_by_text(group, exact=True),
+            page.get_by_text(group, exact=True),
+        ]
+        result = _visible_first(result_candidates)
+        if result is None:
+            return False, f"Não encontrei resultado visível para o grupo '{group}'. Confira o nome exato no WhatsApp."
+
+        result.click(timeout=10000)
+        page.wait_for_timeout(1200)
+        current_header = _read_current_chat_header(page)
+        if group.casefold() not in current_header:
+            # Aguarda a atualização do painel e tenta ler o cabeçalho novamente.
+            try:
+                page.wait_for_function(
+                    """(name) => {
+                        const selectors = [
+                          '[data-testid="conversation-header"]',
+                          '[data-testid="conversation-panel-wrapper"] header',
+                          '#main header'
+                        ];
+                        return selectors.some(s => [...document.querySelectorAll(s)]
+                          .some(el => (el.innerText || '').toLocaleLowerCase().includes(name.toLocaleLowerCase())));
+                    }""",
+                    arg=group,
+                    timeout=5000,
+                )
+            except Exception:
+                pass
+            current_header = _read_current_chat_header(page)
+        if group.casefold() not in current_header:
+            return False, (
+                f"Cliquei no resultado, mas não consegui confirmar o grupo '{group}'. "
+                "Por segurança, nenhuma mensagem foi enviada."
+            )
+        return True, ""
+    except Exception as exc:
+        return False, f"Erro ao abrir o grupo '{group}': {type(exc).__name__}: {exc}"
+
+
+def _find_composer(page):
+    return _visible_first([
+        page.locator('#main footer div[contenteditable="true"]'),
+        page.locator('footer [contenteditable="true"][role="textbox"]'),
+        page.locator('footer div[contenteditable="true"]'),
+        page.locator('div[contenteditable="true"][aria-label*="Mensagem"]'),
+        page.locator('div[contenteditable="true"][aria-label*="Message"]'),
+        page.locator('[data-testid="conversation-compose-box-input"]'),
+    ])
 
 
 def send_to_group(message: str, group_name: str | None = None) -> tuple[bool, str]:
-    """Envia UMA mensagem para o grupo configurado, mantendo a sessão do navegador aberta."""
+    """Envia UMA mensagem ao grupo configurado e confirma que o campo foi limpo."""
     group = (group_name or os.getenv("WHATSAPP_GROUP_NAME", "Leads")).strip()
     if not message.strip():
         return False, "Mensagem vazia."
@@ -73,7 +181,7 @@ def send_to_group(message: str, group_name: str | None = None) -> tuple[bool, st
         return False, "Configure WHATSAPP_GROUP_NAME no .env."
 
     global _last_failure_at, _last_failure_message
-    if _last_failure_at and time.monotonic() - _last_failure_at < 60:
+    if _last_failure_at and time.monotonic() - _last_failure_at < 15:
         return False, _last_failure_message or "WhatsApp indisponível; aguardando antes de tentar novamente."
 
     with _lock:
@@ -82,149 +190,88 @@ def send_to_group(message: str, group_name: str | None = None) -> tuple[bool, st
             if not page.url.startswith("https://web.whatsapp.com"):
                 page.goto("https://web.whatsapp.com/", wait_until="domcontentloaded", timeout=60000)
 
-            # A interface do WhatsApp muda os textos e seletores entre versões/idiomas.
-            # Detectamos a lista por vários marcadores de DOM, e o QR separadamente.
             try:
                 page.locator("body").wait_for(state="visible", timeout=20000)
                 page.wait_for_function(
                     """() => {
-                        const body = document.body;
-                        const text = (body?.innerText || '').toLowerCase();
-                        const conversationList = !!(
-                            document.querySelector('#pane-side') ||
-                            document.querySelector('[data-testid="chat-list"]') ||
-                            document.querySelector('[data-testid="chatlist"]') ||
-                            document.querySelector('[aria-label="Lista de conversas"]') ||
-                            document.querySelector('[aria-label="Chat list"]') ||
-                            document.querySelector('div[role="grid"]')
-                        );
-                        const searchBox = !!(
-                            document.querySelector('input[placeholder*="Pesquisar"]') ||
-                            document.querySelector('input[placeholder*="Search"]') ||
-                            document.querySelector('[contenteditable="true"][data-tab="3"]') ||
-                            document.querySelector('[aria-label*="Pesquisar ou começar"]') ||
-                            document.querySelector('[aria-label*="Search or start"]')
+                        const text = (document.body?.innerText || '').toLowerCase();
+                        const loggedIn = !!(
+                          document.querySelector('#pane-side') ||
+                          document.querySelector('[data-testid="chat-list"]') ||
+                          document.querySelector('[data-testid="chatlist"]') ||
+                          document.querySelector('[data-testid="conversation-panel-wrapper"]')
                         );
                         const qr = !!(
-                            document.querySelector('canvas[aria-label*="QR"]') ||
-                            document.querySelector('[data-testid="qrcode"]') ||
-                            document.querySelector('[data-ref] canvas')
-                        ) || text.includes('escaneie o código qr')
-                          || text.includes('scan the qr code')
-                          || text.includes('use whatsapp on your phone');
-                        const loggedInText = text.includes('pesquisar ou começar uma nova conversa')
-                            || text.includes('search or start new chat');
-                        return (conversationList && (searchBox || body?.innerText?.length > 0))
-                            || loggedInText
-                            || qr;
+                          document.querySelector('canvas[aria-label*="QR"]') ||
+                          document.querySelector('[data-testid="qrcode"]') ||
+                          document.querySelector('[data-ref] canvas') ||
+                          text.includes('escaneie o código qr') ||
+                          text.includes('scan the qr code') ||
+                          text.includes('use whatsapp on your phone')
+                        );
+                        return loggedIn || qr;
                     }""",
-                    timeout=45000
+                    timeout=45000,
                 )
             except Exception as exc:
-                try:
-                    Path("data").mkdir(parents=True, exist_ok=True)
-                    page.screenshot(path="data/whatsapp_load_error.png", full_page=True)
-                    diagnostic = (page.locator("body").inner_text(timeout=3000) or "")[:500].replace("\\n", " ")
-                    Path("data/whatsapp_load_error.txt").write_text(
-                        f"url={page.url}\\ntitle={page.title()}\\nerror={type(exc).__name__}: {exc}\\nbody={diagnostic}",
-                        encoding="utf-8"
-                    )
-                except Exception:
-                    diagnostic = ""
+                diagnostic = _save_diagnostic(page, exc)
                 _last_failure_at = time.monotonic()
                 _last_failure_message = (
-                    "A janela de automação não detectou a lista de conversas nem um QR de login. "
-                    "Confira data/whatsapp_load_error.png e data/whatsapp_load_error.txt. "
-                    "Importante: a automação usa o perfil separado data/whatsapp_profile; "
-                    "estar conectado em outra janela normal do Chrome não conecta esse perfil automaticamente."
+                    "O WhatsApp Web não carregou a lista de conversas nem mostrou um QR de login. "
+                    f"Diagnóstico salvo em data/whatsapp_load_error.txt. {diagnostic[:350]}"
                 )
-                logging.warning("%s URL=%s título=%s corpo=%s", _last_failure_message, page.url, page.title(), diagnostic)
+                logging.warning("Mapeador WhatsApp: %s", _last_failure_message)
                 return False, _last_failure_message
 
-            body_text = (page.locator("body").inner_text(timeout=10000) or "").casefold()
-            if ("qr code" in body_text or "código qr" in body_text) and (
-                "pesquisar ou começar" not in body_text and "search or start new chat" not in body_text
-            ):
+            body_text = (page.locator("body").inner_text(timeout=8000) or "").casefold()
+            if any(term in body_text for term in ("escaneie o código qr", "scan the qr code", "use whatsapp on your phone")):
                 _last_failure_at = time.monotonic()
                 _last_failure_message = (
-                    "WhatsApp Web está pedindo autenticação. Escaneie o QR Code nesta janela; "
-                    "a sessão será reutilizada nas próximas mensagens."
+                    "WhatsApp Web está pedindo autenticação. Escaneie o QR Code na janela aberta; "
+                    "o perfil persistente será reutilizado depois."
                 )
                 return False, _last_failure_message
 
-            # Primeiro verifica se o grupo correto já está aberto; evita depender do seletor de busca.
-            current_header = _read_current_chat_header(page)
-            if group.casefold() not in current_header:
-                search_candidates = [
-                    page.locator('div[contenteditable="true"][data-tab="3"]').first,
-                    page.locator('div[contenteditable="true"][aria-label*="Pesquisar"]').first,
-                    page.locator('div[contenteditable="true"][aria-label*="Search"]').first,
-                    page.locator('button[aria-label*="Pesquisar"]').first,
-                    page.locator('button[aria-label*="Search"]').first,
-                ]
-                search = None
-                for candidate in search_candidates:
-                    try:
-                        if candidate.count() and candidate.is_visible():
-                            search = candidate
-                            break
-                    except Exception:
-                        continue
-                if search is None:
-                    _last_failure_at = time.monotonic()
-                    _last_failure_message = "WhatsApp abriu, mas não encontrei o campo de pesquisa. Nenhuma mensagem foi enviada."
-                    return False, _last_failure_message
+            opened, detail = _open_target_group(page, group)
+            if not opened:
+                _last_failure_at = time.monotonic()
+                _last_failure_message = detail
+                logging.warning("Mapeador WhatsApp: %s", detail)
+                return False, detail
 
-                search.click(timeout=15000)
-                try:
-                    search.fill(group, timeout=10000)
-                except Exception:
-                    search.press("Control+A")
-                    search.type(group, delay=80)
-                page.wait_for_timeout(1800)
-
-                exact_results = page.get_by_text(group, exact=True)
-                if exact_results.count() == 0:
-                    _last_failure_at = time.monotonic()
-                    _last_failure_message = f"Não encontrei um chat com o nome exato '{group}'."
-                    return False, _last_failure_message
-                exact_results.last.click(timeout=15000)
-                page.wait_for_timeout(1000)
-
-                current_header = page.locator('[data-testid="conversation-header"]').first.inner_text(timeout=10000).casefold()
-                if group.casefold() not in current_header:
-                    _last_failure_at = time.monotonic()
-                    _last_failure_message = f"Não consegui confirmar que o chat aberto é '{group}'. Nada foi enviado."
-                    return False, _last_failure_message
-
-            composer_candidates = [
-                page.locator('footer div[contenteditable="true"]').last,
-                page.locator('div[contenteditable="true"][aria-label*="Mensagem"]').last,
-                page.locator('div[contenteditable="true"][aria-label*="Message"]').last,
-            ]
-            composer = None
-            for candidate in composer_candidates:
-                try:
-                    if candidate.count() and candidate.is_visible():
-                        composer = candidate
-                        break
-                except Exception:
-                    continue
+            composer = _find_composer(page)
             if composer is None:
                 _last_failure_at = time.monotonic()
-                _last_failure_message = "O grupo foi aberto, mas não encontrei a caixa de mensagem. Nada foi enviado."
+                _last_failure_message = "O grupo foi confirmado, mas a caixa de mensagem não apareceu. Nada foi enviado."
+                logging.warning("Mapeador WhatsApp: %s", _last_failure_message)
                 return False, _last_failure_message
-            composer.wait_for(timeout=15000)
-            composer.fill(message[:10000])
-            composer.press("Enter")
-            page.wait_for_timeout(1000)
+
+            composer.click(timeout=8000)
+            composer.fill(message[:10000], timeout=10000)
+            composer.press("Enter", timeout=8000)
+            page.wait_for_timeout(1200)
+
+            # Se o campo ainda contém texto, não declare sucesso falso.
+            try:
+                remaining = composer.inner_text(timeout=2000).strip()
+            except Exception:
+                remaining = ""
+            if remaining:
+                _last_failure_at = time.monotonic()
+                _last_failure_message = (
+                    "O WhatsApp não limpou o campo depois de pressionar Enter; "
+                    "não consegui confirmar o envio. Confira a conversa antes de tentar novamente."
+                )
+                logging.warning("Mapeador WhatsApp: %s", _last_failure_message)
+                return False, _last_failure_message
+
             _last_failure_at = 0.0
             _last_failure_message = ""
-            return True, f"Mensagem enviada ao grupo '{group}'."
+            return True, f"Mensagem enviada ao grupo '{group}' (campo de envio confirmado)."
         except Exception as exc:
-            logging.warning("Falha ao enviar notificação para grupo WhatsApp: %s", exc)
+            logging.exception("Falha ao enviar notificação para grupo WhatsApp")
             _last_failure_at = time.monotonic()
-            _last_failure_message = f"Falha no WhatsApp Web ({type(exc).__name__}); confira a sessão e o nome do grupo."
+            _last_failure_message = f"Falha no WhatsApp Web ({type(exc).__name__}: {exc})."
             return False, _last_failure_message
 
 
