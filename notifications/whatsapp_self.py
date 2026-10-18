@@ -338,19 +338,22 @@ def _send_to_group_impl(message: str, group_name: str | None = None) -> tuple[bo
             except Exception:
                 remaining = ""
             after_count = outgoing_count()
-            if remaining or after_count <= before_count:
+            if remaining:
                 _last_failure_at = time.monotonic()
                 _last_failure_message = (
-                    f"Não consegui confirmar uma nova mensagem enviada ao grupo '{group}'. "
-                    "O teste anterior não deve ser considerado confirmação de entrega; confira a conversa aberta."
+                    f"O texto continuou na caixa de mensagem do grupo '{group}'; "
+                    "não vou marcar como enviado para permitir uma nova tentativa após conferência."
                 )
                 logging.warning("Mapeador WhatsApp: %s (mensagens antes=%s, depois=%s, campo_restante=%s)",
                                 _last_failure_message, before_count, after_count, bool(remaining))
                 return False, _last_failure_message
 
+            # O WhatsApp Web pode atualizar a lista de mensagens com atraso ou mudar seus
+            # seletores. Campo de composição vazio após Enter é o sinal mais útil para
+            # não repetir a mesma proposta indefinidamente.
             _last_failure_at = 0.0
             _last_failure_message = ""
-            return True, f"Envio processado no grupo '{group}'; confira a mensagem na conversa para confirmar a entrega."
+            return True, f"Mensagem processada no grupo '{group}' (campo de composição limpo). Confira a conversa para validar a entrega."
         except Exception as exc:
             logging.exception("Falha ao enviar notificação para grupo WhatsApp")
             _last_failure_at = time.monotonic()
