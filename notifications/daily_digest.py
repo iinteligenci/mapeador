@@ -107,21 +107,21 @@ def _fold(value: str) -> str:
 def _city_from_address(address: str) -> str:
     """Reconhece municípios da Grande Vitória e cidades próximas em endereços do Maps."""
     cities = {
-        "Vitoria": ("vitoria",),
+        "Vitória": ("vitoria",),
         "Vila Velha": ("vila velha",),
         "Cariacica": ("cariacica",),
         "Serra": ("serra",),
         "Viana": ("viana",),
         "Guarapari": ("guarapari",),
-        "Fundao": ("fundao",),
+        "Fundão": ("fundao",),
         "Domingos Martins": ("domingos martins",),
         "Marechal Floriano": ("marechal floriano",),
         "Santa Leopoldina": ("santa leopoldina",),
         "Aracruz": ("aracruz",),
-        "Joao Neiva": ("joao neiva",),
+        "João Neiva": ("joao neiva",),
         "Anchieta": ("anchieta",),
         "Iconha": ("iconha",),
-        "Piuna": ("piuna",),
+        "Piúma": ("piuma",),
     }
     folded = _fold(address)
     for canonical, variants in cities.items():
@@ -152,26 +152,26 @@ def _neighborhood(lead: dict) -> str:
         ("Bento Ferreira", ("bento ferreira",)),
         ("Enseada do Sua", ("enseada do sua",)),
         ("Campo Grande", ("campo grande",)),
-        ("Jardim America", ("jardim america",)),
-        ("Marcilio de Noronha", ("marcilio de noronha",)),
+        ("Jardim América", ("jardim america",)),
+        ("Marcílio de Noronha", ("marcilio de noronha",)),
         ("Praia do Morro", ("praia do morro",)),
         ("Praia Grande", ("praia grande",)),
-        ("Itapua", ("itapua",)),
-        ("Ataide", ("ataide",)),
-        ("Gloria", ("gloria",)),
+        ("Itapuã", ("itapua",)),
+        ("Ataíde", ("ataide",)),
+        ("Glória", ("gloria",)),
         ("Soteco", ("soteco",)),
         ("Goiabeiras", ("goiabeiras",)),
-        ("Maruipe", ("maruipe",)),
-        ("Itarare", ("itarare",)),
-        ("Jacaraipe", ("jacaraipe",)),
+        ("Maruípe", ("maruipe",)),
+        ("Itararé", ("itarare",)),
+        ("Jacaraípe", ("jacaraipe",)),
         ("Laranjeiras", ("laranjeiras",)),
         ("Feu Rosa", ("feu rosa",)),
         ("Barcelona", ("barcelona",)),
         ("Carapina", ("carapina",)),
-        ("Itaciba", ("itaciba",)),
+        ("Itacibá", ("itaciba",)),
         ("Alto Lage", ("alto lage",)),
         ("Muquicaba", ("muquicaba",)),
-        ("Meaipe", ("meaipe",)),
+        ("Meaípe", ("meaipe",)),
         ("Marcilio de Noronha", ("marcilio de noronha",)),
         ("Centro", ("centro",)),
         ("Feu Rosa", ("feu rosa",)),
@@ -229,7 +229,7 @@ def _send_routes(today: str) -> bool:
         groups.setdefault(name, []).append(lead)
     all_ok = True
     for neighborhood, places in sorted(groups.items(), key=lambda item: item[0].casefold()):
-        if len(places) <= 10 or neighborhood == "Bairro não identificado":
+        if len(places) <= 10 or neighborhood.startswith("Bairro não identificado"):
             continue
         event_key = "route:" + neighborhood.casefold()
         legacy_key = "route:" + neighborhood.split(" — ", 1)[0].casefold()
