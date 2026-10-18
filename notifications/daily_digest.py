@@ -553,7 +553,8 @@ def _send_proposals(profile: str, today: str, daily_limit: int = 5) -> tuple[int
             "",
             "Esta é uma proposta de prospecção para revisão. Não é uma rota de visitas.",
         ])
-        ok, detail = send_to_group(message[:3500])
+        target_group = "Presença lead" if profile == "digital" else None
+        ok, detail = send_to_group(message[:3500], target_group)
         if ok:
             _mark_sent(event_key, "proposal_" + profile, str(proposal.get("lead_name") or lead_id), today)
             sent_this_cycle += 1
