@@ -180,7 +180,7 @@ def _fold(value: str) -> str:
 
 
 def _city_from_address(address: str) -> str:
-    """Reconhece municípios da Grande Vitória e cidades próximas em endereços do Maps."""
+    """Identifica município nos segmentos finais do endereço do Google Maps."""
     cities = {
         "Vitória": ("vitoria",),
         "Vila Velha": ("vila velha",),
@@ -198,9 +198,12 @@ def _city_from_address(address: str) -> str:
         "Iconha": ("iconha",),
         "Piúma": ("piuma",),
     }
-    folded = _fold(address)
+    parts = [part.strip() for part in re.split(r"[,|]", str(address or "")) if part.strip()]
+    # O município costuma aparecer no final do endereço; evita confundir nomes de ruas
+    # ou estabelecimentos com o município.
+    tail = _fold(" ".join(parts[-3:]))
     for canonical, variants in cities.items():
-        if any(re.search(r"\b" + re.escape(variant) + r"\b", folded) for variant in variants):
+        if any(re.search(r"\b" + re.escape(variant) + r"\b", tail) for variant in variants):
             return canonical
     return ""
 
@@ -304,12 +307,17 @@ def _send_routes(today: str) -> bool:
         groups.setdefault(name, []).append(lead)
     all_ok = True
     for neighborhood, places in sorted(groups.items(), key=lambda item: item[0].casefold()):
-        if len(places) <= 10 or neighborhood.startswith("Bairro não identificado"):
+        if len(places) < 10 or neighborhood.startswith("Bairro não identificado"):
             continue
+        # A chave inclui bairro + município: Praia do Canto em Vitória não bloqueia
+        # Praia do Canto (ou outro bairro homônimo) em outro município.
         event_key = "route:" + neighborhood.casefold()
         legacy_key = "route:" + neighborhood.split(" — ", 1)[0].casefold()
-        # Compatibilidade: não reenviar bairro já notificado antes da separação por cidade.
-        if _was_sent(event_key) or (legacy_key != event_key and _was_sent(legacy_key)):
+        already_sent = _was_sent(event_key)
+        # Mantém compatibilidade com rotas antigas apenas para Vila Velha; nunca bloqueia outras cidades.
+        if not already_sent and neighborhood.casefold().endswith(" — vila velha") and legacy_key != event_key:
+            already_sent = _was_sent(legacy_key)
+        if already_sent:
             continue
         lines = [
             f"🗺️ ROTA DE VISITAS — {neighborhood.upper()}",
@@ -397,14 +405,18 @@ def _send_proposals(profile: str, today: str, daily_limit: int = 5) -> tuple[int
             continue
         if _emails(proposal.get("contact_emails")) and _whatsapp(proposal):
             unique[lead_id] = proposal
-    sent_today = _count_sent_today("proposal_" + profile, today)
+    unsent = [
+        (lead_id, proposal)
+        for lead_id, proposal in sorted(unique.items(), key=lambda item: (-int(item[1].get("score") or 0), item[0]))
+        if not _was_sent(f"proposal:{profile}:{lead_id}")
+    ]
+    # Só dispara quando há um lote completo de cinco propostas inéditas.
+    if len(unsent) < daily_limit:
+        return 0, True
+    sent_this_cycle = 0
     all_ok = True
-    for lead_id, proposal in sorted(unique.items(), key=lambda item: (-int(item[1].get("score") or 0), item[0])):
-        if sent_today >= daily_limit:
-            break
+    for lead_id, proposal in unsent[:daily_limit]:
         event_key = f"proposal:{profile}:{lead_id}"
-        if _was_sent(event_key):
-            continue
         email = _emails(proposal.get("contact_emails"))[0]
         whatsapp = _whatsapp(proposal)
         maps_url = str(proposal.get("maps_url") or "")
@@ -430,11 +442,11 @@ def _send_proposals(profile: str, today: str, daily_limit: int = 5) -> tuple[int
         ok, detail = send_to_group(message[:3500])
         if ok:
             _mark_sent(event_key, "proposal_" + profile, str(proposal.get("lead_name") or lead_id), today)
-            sent_today += 1
+            sent_this_cycle += 1
         else:
             all_ok = False
             logging.warning("Proposta %s para %s não enviada: %s", label, proposal.get("lead_name"), detail)
-    return sent_today, all_ok
+    return sent_this_cycle, all_ok
 
 
 def send_eligible_routes_now() -> tuple[bool, str]:
@@ -464,21 +476,22 @@ def run_daily_notifications() -> tuple[bool, str]:
 
 
 def daily_notifications_loop() -> None:
-    """Verifica horários configurados e executa cada horário no máximo uma vez por dia."""
+    """Busca continuamente lotes de propostas e rotas ainda não notificados."""
     _init_log()
     while True:
         try:
-            now = datetime.now().astimezone()
-            today = now.date().isoformat()
             schedule = get_notification_schedule()
-            current_time = now.strftime("%H:%M")
-            if schedule["enabled"] and current_time in schedule["times"] and not _schedule_run_done(today, current_time):
-                ok, detail = run_scheduled_notifications()
-                logging.info("Mapeador — notificações WhatsApp (%s): %s", current_time, detail)
-                if ok:
-                    _mark_schedule_run(today, current_time)
-                else:
-                    logging.warning("Algumas notificações falharam; o horário será tentado novamente.")
+            if schedule["enabled"] and os.getenv("WHATSAPP_NOTIFICATIONS", "false").strip().lower() in {"1", "true", "yes", "sim"}:
+                today = datetime.now().astimezone().date().isoformat()
+                ok_routes = _send_routes(today)
+                _ensure_proposals(limit=30)
+                count_4k, ok_4k = _send_proposals("4k", today, 5)
+                count_digital, ok_digital = _send_proposals("digital", today, 5)
+                if count_4k or count_digital or not ok_routes or not ok_4k or not ok_digital:
+                    logging.info(
+                        "Mapeador — ciclo WhatsApp: %s propostas 4K, %s de presença digital; rotas verificadas.",
+                        count_4k, count_digital
+                    )
         except Exception as exc:
-            logging.warning("Erro na rotina de notificações: %s", exc)
-        time.sleep(20)
+            logging.warning("Erro na rotina contínua de notificações: %s", exc)
+        time.sleep(30)
