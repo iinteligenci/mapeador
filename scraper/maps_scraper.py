@@ -20,6 +20,29 @@ def _clean(value: str | None) -> str:
     return re.sub(r"\s+", " ", value or "").strip()
 
 
+async def _goto_with_retries(page, url: str, timeout: int = 35000) -> bool:
+    """Tenta recuperar falhas transitórias de rede sem derrubar a automação."""
+    import asyncio
+    for attempt, delay in enumerate((0, 3, 8), start=1):
+        if delay:
+            await asyncio.sleep(delay)
+        try:
+            await page.goto(url, wait_until="domcontentloaded", timeout=timeout)
+            return True
+        except Exception as exc:
+            message = str(exc)
+            transient = any(token in message for token in (
+                "ERR_NETWORK_CHANGED", "ERR_INTERNET_DISCONNECTED",
+                "ERR_CONNECTION_RESET", "ERR_CONNECTION_CLOSED",
+                "ERR_NAME_NOT_RESOLVED", "Timeout"
+            ))
+            if not transient or attempt == 3:
+                logger.warning("Navegação falhou após %s tentativa(s): %s | %s", attempt, url, message[:220])
+                return False
+            logger.warning("Falha de rede na tentativa %s/3; aguardando para tentar novamente: %s", attempt, message[:160])
+    return False
+
+
 async def search_google_maps(term: str, limit: int = 10, exclude_links: set[str] | None = None) -> list[dict[str, str]]:
     """Retorna leads com nome, categoria, link, telefone, endereço e site quando disponíveis."""
     term = _clean(term)
@@ -37,8 +60,9 @@ async def search_google_maps(term: str, limit: int = 10, exclude_links: set[str]
         context = await browser.new_context(locale="pt-BR", viewport={"width": 1365, "height": 900})
         page = await context.new_page()
         try:
-            await page.goto(f"https://www.google.com/maps/search/{quote_plus(term)}",
-                            wait_until="domcontentloaded", timeout=35000)
+            search_url = f"https://www.google.com/maps/search/{quote_plus(term)}"
+            if not await _goto_with_retries(page, search_url, timeout=35000):
+                return []
             feed = page.locator('div[role="feed"]')
             try:
                 await feed.wait_for(timeout=9000)
@@ -123,7 +147,9 @@ async def search_google_maps(term: str, limit: int = 10, exclude_links: set[str]
 
             for lead in candidates[:limit]:
                 try:
-                    await page.goto(lead["link"], wait_until="domcontentloaded", timeout=22000)
+                    if not await _goto_with_retries(page, lead["link"], timeout=22000):
+                        results.append(lead)
+                        continue
                     try:
                         await page.locator("h1").first.wait_for(timeout=7000)
                     except PlaywrightTimeoutError:
