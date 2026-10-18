@@ -1674,14 +1674,14 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
 </nav>
 <section class="panel"><h2>Envios automáticos pelo WhatsApp</h2>
 {% if message %}<div class="alert {{ 'success' if message.startswith('OK:') else '' }}">{{ message }}</div>{% endif %}
-<p class="muted">Sem horários fixos. O Mapeador verifica continuamente as novidades e envia ao grupo Leads quando houver um lote de 5 propostas inéditas por perfil ou uma rota com pelo menos 10 estabelecimentos ainda não notificada no bairro. O registro impede reenvios.</p>
+<p class="muted">Este controle é independente da pesquisa. Com ele ligado, o Mapeador analisa os estabelecimentos e propostas já salvos no banco e envia ao grupo Leads as melhores propostas inéditas disponíveis (uma por perfil em cada ciclo), além das rotas elegíveis. Não precisa esperar juntar cinco propostas; o registro impede reenvios.</p>
 <form method="post" action="/notifications/schedule" id="notificationScheduleForm">
-<label style="display:flex;align-items:center;gap:10px;margin:10px 0 16px"><input type="checkbox" name="enabled" value="yes" style="width:auto;min-height:0;margin:0" {% if notification_schedule.enabled %}checked{% endif %}> Ativar envios automáticos contínuos</label>
+<label style="display:flex;align-items:center;gap:10px;margin:10px 0 16px"><input type="checkbox" name="enabled" value="yes" style="width:auto;min-height:0;margin:0" {% if notification_schedule.enabled %}checked{% endif %}> Ligar/desligar somente os envios pelo WhatsApp</label>
 <button type="submit">Salvar ativação</button>
 </form>
 <form method="post" action="/notifications/test"><p class="muted">Teste manual de conexão com o grupo WhatsApp configurado.</p><button type="submit">Testar envio para o WhatsApp agora</button></form>
 </section>
-<section class="panel"><h2>Controle da automação</h2><p><strong>Status:</strong> <span style="color:{{ '#35d49a' if settings.enabled else '#ffcc80' }};font-weight:800">{{ 'LIGADO' if settings.enabled else 'DESLIGADO' }}</span></p>
+<section class="panel"><h2>Pesquisa e enriquecimento automáticos</h2><p class="muted">Este controle é independente do WhatsApp. Desligue-o para parar novas pesquisas e coleta de dados; os envios pelo WhatsApp podem continuar usando o banco já preenchido.</p><p><strong>Status:</strong> <span style="color:{{ '#35d49a' if settings.enabled else '#ffcc80' }};font-weight:800">{{ 'LIGADO' if settings.enabled else 'DESLIGADO' }}</span></p>
 <form method="post" action="/automatic/toggle" style="display:flex;gap:10px;flex-wrap:wrap">
 <button type="submit" name="enabled" value="yes" style="background:#35d49a">▶ Ligar automação</button>
 <button type="submit" name="enabled" value="no" style="background:#ffcc80">Ⅱ Desligar automação</button>
