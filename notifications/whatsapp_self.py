@@ -48,8 +48,30 @@ def send_to_group(message: str, group_name: str | None = None) -> tuple[bool, st
                 try:
                     page = context.pages[0] if context.pages else context.new_page()
                     page.goto("https://web.whatsapp.com/", wait_until="domcontentloaded", timeout=60000)
-                    # Aguarda sessão autenticada; primeira execução pode precisar do QR.
-                    page.locator('div[contenteditable="true"]').first.wait_for(timeout=180000)
+                    # Aguarda o aplicativo carregar e identifica se a sessão pede QR/login.
+                    try:
+                        page.locator(
+                            'div[contenteditable="true"], canvas[aria-label*="Scan"], '
+                            'canvas[aria-label*="QR"], [data-testid="qrcode"], '
+                            'text="Use o WhatsApp no seu celular para escanear o código QR"'
+                        ).first.wait_for(timeout=45000)
+                    except Exception:
+                        page.screenshot(path="data/whatsapp_load_error.png", full_page=True)
+                        _last_failure_at = time.monotonic()
+                        _last_failure_message = (
+                            "WhatsApp Web não carregou a tela de conversa nem o QR Code em 45 segundos. "
+                            "Veja data/whatsapp_load_error.png e abra https://web.whatsapp.com/ no navegador."
+                        )
+                        return False, _last_failure_message
+
+                    editable = page.locator('div[contenteditable="true"]')
+                    if editable.count() == 0:
+                        _last_failure_at = time.monotonic()
+                        _last_failure_message = (
+                            "WhatsApp Web está pedindo autenticação. Escaneie o QR Code na janela do navegador "
+                            "que abriu para o Mapeador e tente novamente."
+                        )
+                        return False, _last_failure_message
 
                     search = page.locator(
                         'div[contenteditable="true"][data-tab="3"], '
