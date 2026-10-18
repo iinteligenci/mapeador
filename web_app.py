@@ -355,14 +355,14 @@ _CITY_ALIASES = {
 
 def _fold_text(value: object) -> str:
     import unicodedata
-    return re.sub(r"\\s+", " ", unicodedata.normalize("NFKD", str(value or "")).encode("ascii", "ignore").decode("ascii").casefold()).strip()
+    return re.sub(r"\s+", " ", unicodedata.normalize("NFKD", str(value or "")).encode("ascii", "ignore").decode("ascii").casefold()).strip()
 
 
 def _city_from_search_term(term: str) -> str:
     folded = _fold_text(term)
     # A localidade precisa ser explícita no termo configurado.
     for canonical in sorted(_CITY_ALIASES, key=len, reverse=True):
-        if re.search(r"\\b" + re.escape(canonical) + r"\\b", folded):
+        if re.search(r"\b" + re.escape(canonical) + r"\b", folded):
             return canonical
     return ""
 
@@ -373,7 +373,7 @@ def _lead_city(lead: dict[str, Any]) -> str:
     parts = [part.strip() for part in re.split(r"[,|]", folded) if part.strip()]
     tail = " ".join(parts[-3:])
     for canonical in sorted(_CITY_ALIASES, key=len, reverse=True):
-        if re.search(r"\\b" + re.escape(canonical) + r"\\b", tail):
+        if re.search(r"\b" + re.escape(canonical) + r"\b", tail):
             return canonical
     return ""
 
