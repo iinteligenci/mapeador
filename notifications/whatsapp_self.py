@@ -338,7 +338,7 @@ def _send_to_group_impl(message: str, group_name: str | None = None) -> tuple[bo
             except Exception:
                 remaining = ""
             after_count = outgoing_count()
-            if remaining or (before_count > 0 and after_count <= before_count):
+            if remaining or after_count <= before_count:
                 _last_failure_at = time.monotonic()
                 _last_failure_message = (
                     f"Não consegui confirmar uma nova mensagem enviada ao grupo '{group}'. "
