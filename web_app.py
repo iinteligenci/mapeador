@@ -1874,12 +1874,15 @@ def _background_research_loop() -> None:
                     # Gemini plans targeted search formulations; each result is verified by Maps.
                     search_queries = plan_deep_searches(base_term, limit=4)
                     found_count = 0
+                    print(f"Mapeador automático — iniciando busca: {base_term} | lote de até {batch_size} novos estabelecimentos.")
                     for query in search_queries:
                         if found_count >= batch_size:
                             break
+                        print(f"Mapeador automático — pesquisando no Google Maps: {query}")
                         try:
                             found = asyncio.run(search_google_maps(
                                 query, max(1, batch_size - found_count), exclude_links=known_links))
+                            print(f"Mapeador automático — consulta concluída: {len(found)} resultado(s) novo(s) potencial(is).")
                             for new_lead in found:
                                 lead_id, inserted = save_lead(new_lead, db_path)
                                 normalized = str(new_lead.get("link") or "").split("?")[0].rstrip("/")
