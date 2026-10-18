@@ -620,7 +620,7 @@ def run_proposals_now() -> tuple[bool, str]:
         for proposal in proposals:
             lead_id = int(proposal.get("lead_id") or 0)
             if lead_id and lead_id not in eligible and not _is_distributor(proposal):
-                if _emails(proposal.get("contact_emails")) and _whatsapp(proposal):
+                if _whatsapp(proposal):
                     eligible[lead_id] = proposal
         unsent = [lead_id for lead_id in eligible if not _was_sent(f"proposal:{profile}:{lead_id}")]
         sent, ok = _send_proposals(profile, today, 1)
