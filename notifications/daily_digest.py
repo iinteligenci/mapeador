@@ -302,44 +302,91 @@ def _neighborhood(lead: dict) -> str:
     return f"{neighborhood} — {city}" if city else neighborhood
 
 def _send_routes(today: str) -> bool:
+    """Envia rotas em lotes de 10 estabelecimentos inéditos por bairro/município."""
     leads = [item for item in get_leads(path=_db_path()) if item.get("status") == "in_person"]
     groups: dict[str, list[dict]] = {}
     for lead in leads:
-        name = _neighborhood(lead)
-        groups.setdefault(name, []).append(lead)
+        neighborhood = _neighborhood(lead)
+        if neighborhood.startswith("Bairro não identificado"):
+            continue
+        groups.setdefault(neighborhood, []).append(lead)
+
     all_ok = True
-    for neighborhood, places in sorted(groups.items(), key=lambda item: item[0].casefold()):
-        if len(places) < 10 or neighborhood.startswith("Bairro não identificado"):
-            continue
-        # A chave inclui bairro + município: Praia do Canto em Vitória não bloqueia
-        # Praia do Canto (ou outro bairro homônimo) em outro município.
-        event_key = "route:" + neighborhood.casefold()
-        legacy_key = "route:" + neighborhood.split(" — ", 1)[0].casefold()
-        already_sent = _was_sent(event_key)
-        # Mantém compatibilidade com rotas antigas apenas para Vila Velha; nunca bloqueia outras cidades.
-        if not already_sent and neighborhood.casefold().endswith(" — vila velha") and legacy_key != event_key:
-            already_sent = _was_sent(legacy_key)
-        if already_sent:
-            continue
-        lines = [
-            f"🗺️ ROTA DE VISITAS — {neighborhood.upper()}",
-            f"Visitas presenciais cadastradas neste bairro: {len(places)}",
-            "Mensagem de rota do Mapeador; não é proposta comercial.",
-            "",
-        ]
-        for place in sorted(places, key=lambda item: str(item.get("name") or "").casefold()):
-            address = str(place.get("address") or "Endereço não identificado")
-            maps_url = str(place.get("link") or (
-                "https://www.google.com/maps/search/?api=1&query=" +
-                quote(str(place.get("name") or "") + " " + address)
-            ))
-            lines.extend([f"• {place.get('name') or 'Estabelecimento'}", f"  Endereço: {address}", f"  Google Maps: {maps_url}", ""])
-        ok, detail = send_to_group("\n".join(lines)[:10000])
-        if ok:
-            _mark_sent(event_key, "route", neighborhood, today)
-        else:
-            all_ok = False
-            logging.warning("Rota do bairro %s não enviada: %s", neighborhood, detail)
+    with _connect() as conn:
+        for neighborhood, places in sorted(groups.items(), key=lambda item: item[0].casefold()):
+            route_key = "route:" + neighborhood.casefold()
+            legacy_key = "route:" + neighborhood.split(" — ", 1)[0].casefold()
+
+            # Migra notificações antigas: o registro antigo guarda a data do envio,
+            # então estabelecimentos cadastrados antes dele são considerados parte
+            # da rota já enviada. Os cadastrados depois continuam elegíveis.
+            old_route = conn.execute(
+                "SELECT sent_date, sent_at FROM notification_log WHERE event_key IN (?, ?) "
+                "ORDER BY sent_at DESC LIMIT 1",
+                (route_key, legacy_key),
+            ).fetchone()
+            if old_route:
+                sent_at = str(old_route["sent_at"] or "")
+                for place in places:
+                    lead_id = int(place.get("id") or 0)
+                    created_at = str(place.get("created_at") or "")
+                    if not lead_id or not created_at or created_at > sent_at:
+                        continue
+                    conn.execute(
+                        "INSERT OR IGNORE INTO notification_log(event_key, category, label, sent_date, sent_at) "
+                        "VALUES (?, 'route_place', ?, ?, ?)",
+                        (f"route_place:{neighborhood.casefold()}:{lead_id}", neighborhood, old_route["sent_date"], sent_at),
+                    )
+
+            unsent = []
+            for place in sorted(places, key=lambda item: (str(item.get("name") or "").casefold(), int(item.get("id") or 0))):
+                lead_id = int(place.get("id") or 0)
+                if not lead_id:
+                    continue
+                place_key = f"route_place:{neighborhood.casefold()}:{lead_id}"
+                if not _was_sent(place_key):
+                    unsent.append(place)
+
+            # Não enviar uma rota incompleta: aguarda 10 estabelecimentos inéditos.
+            while len(unsent) >= 10:
+                batch = unsent[:10]
+                lines = [
+                    f"🗺️ ROTA DE VISITAS — {neighborhood.upper()}",
+                    f"Novos estabelecimentos neste envio: {len(batch)}",
+                    f"Total de estabelecimentos cadastrados no bairro: {len(places)}",
+                    "Somente locais ainda não enviados em rotas anteriores.",
+                    "",
+                ]
+                for place in batch:
+                    address = str(place.get("address") or "Endereço não identificado")
+                    maps_url = str(place.get("link") or (
+                        "https://www.google.com/maps/search/?api=1&query=" +
+                        quote(str(place.get("name") or "") + " " + address)
+                    ))
+                    lines.extend([
+                        f"• {place.get('name') or 'Estabelecimento'}",
+                        f"  Endereço: {address}",
+                        f"  Google Maps: {maps_url}",
+                        "",
+                    ])
+
+                ok, detail = send_to_group("\\n".join(lines)[:10000])
+                if not ok:
+                    all_ok = False
+                    logging.warning("Rota do bairro %s não enviada: %s", neighborhood, detail)
+                    break
+
+                # Registra individualmente só depois da confirmação do envio.
+                for place in batch:
+                    lead_id = int(place.get("id") or 0)
+                    _mark_sent(
+                        f"route_place:{neighborhood.casefold()}:{lead_id}",
+                        "route_place",
+                        str(place.get("name") or lead_id),
+                        today,
+                    )
+                unsent = unsent[10:]
+
     return all_ok
 
 
