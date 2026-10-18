@@ -11,7 +11,8 @@ from pathlib import Path
 from urllib.parse import quote
 
 from ai_agent.analyzer import analyze_lead_profiles
-from database.db import get_leads, get_proposals, init_db, save_proposal
+from database.db import get_leads, get_proposals, init_db, save_proposal, update_public_contacts
+from scraper.public_contacts import find_public_business_contacts
 from notifications.whatsapp_self import send_to_group
 
 
@@ -58,6 +59,15 @@ def _mark_sent(event_key: str, category: str, label: str, today: str) -> None:
             "INSERT OR IGNORE INTO notification_log(event_key, category, label, sent_date) VALUES (?, ?, ?, ?)",
             (event_key, category, label, today),
         )
+
+
+def _count_sent_today(category: str, today: str) -> int:
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) AS n FROM notification_log WHERE category=? AND sent_date=?",
+            (category, today),
+        ).fetchone()
+        return int(row["n"] or 0)
 
 
 def _daily_complete(today: str) -> bool:
@@ -164,7 +174,20 @@ def _ensure_proposals(limit: int = 15) -> None:
     for lead in leads:
         if processed >= limit:
             break
-        if lead.get("status") in {"removed", "in_person"} or not _eligible_lead(lead):
+        if lead.get("status") in {"removed", "in_person"}:
+            continue
+        # Try to discover only publicly published contacts on the business's own website.
+        if not _eligible_lead(lead) and str(lead.get("website") or "").startswith(("https://", "http://")):
+            try:
+                contacts = find_public_business_contacts(lead)
+                update_public_contacts(int(lead["id"]), contacts, _db_path())
+                lead.update(contacts)
+                refreshed = next((item for item in get_leads(path=_db_path()) if int(item.get("id") or 0) == int(lead["id"])), None)
+                if refreshed:
+                    lead = refreshed
+            except Exception as contact_exc:
+                logging.info("Contatos públicos indisponíveis para %s: %s", lead.get("name"), contact_exc)
+        if not _eligible_lead(lead):
             continue
         missing = [profile for profile in ("4k", "digital") if (int(lead["id"]), profile) not in existing]
         if not missing:
@@ -200,7 +223,7 @@ def _send_proposals(profile: str, today: str, daily_limit: int = 5) -> tuple[int
             continue
         if _emails(proposal.get("contact_emails")) and _whatsapp(proposal):
             unique[lead_id] = proposal
-    sent_today = 0
+    sent_today = _count_sent_today("proposal_" + profile, today)
     all_ok = True
     for lead_id, proposal in sorted(unique.items(), key=lambda item: (-int(item[1].get("score") or 0), item[0])):
         if sent_today >= daily_limit:
