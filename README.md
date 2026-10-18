@@ -94,3 +94,15 @@ A interface roda no computador e separa a prospecção em duas etapas:
 Para iniciar no Windows, atualize com GitHub Desktop (Fetch origin e Pull origin), instale as dependências com `py -m pip install -r requirements.txt` e execute `py web_app.py`. Abra `http://127.0.0.1:5000`. O banco SQLite fica em `data/`; não o apague ao atualizar o código.
 
 A busca depende do carregamento de resultados do Google Maps e pode encontrar menos negócios que o solicitado se o Maps não apresentar mais resultados. A aplicação não contorna bloqueios e não envia mensagens automaticamente.
+
+
+## Notificações no seu próprio WhatsApp
+
+O Mapeador pode avisar o proprietário no próprio WhatsApp quando uma busca encontra empresas novas, quando uma proposta é gerada e quando o usuário solicita o envio do resumo das rotas por bairro. **Essas notificações são apenas para o número configurado do proprietário; o sistema não dispara mensagens para os estabelecimentos.**
+
+1. No arquivo local `.env`, configure `WHATSAPP_SELF_NUMBER` com o número do próprio usuário em formato internacional e somente dígitos (ex.: `55DDDNUMERO`) e `WHATSAPP_NOTIFICATIONS=true`.
+2. Execute `py web_app.py`. Na primeira notificação, o Mapeador abrirá uma janela própria do Chromium. Escaneie o QR Code do WhatsApp Web se solicitado. A sessão fica salva em `data/whatsapp_profile`.
+3. Nas próximas notificações, o Mapeador tentará enviar o resumo automaticamente para esse número. Para rotas, abra a aba Rotas e clique em **Enviar resumo das rotas para meu WhatsApp**.
+4. Mantenha o computador ligado e o app local executando. Não publique nem compartilhe a pasta `data/whatsapp_profile`; ela contém a sessão autenticada.
+
+A automação usa a interface do WhatsApp Web, que pode mudar e não é uma integração oficial. Pode exigir novo login ou falhar. Use apenas para notificações próprias; não automatize disparos para empresas. Se quiser desativar, defina `WHATSAPP_NOTIFICATIONS=false`.
