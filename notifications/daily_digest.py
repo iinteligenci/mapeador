@@ -178,8 +178,6 @@ def _ensure_proposals(limit: int = 15) -> None:
         if lead.get("status") in {"removed", "in_person"}:
             continue
         examined += 1
-        if lead.get("status") in {"removed", "in_person"}:
-            continue
         # Try to discover only publicly published contacts on the business's own website.
         if not _eligible_lead(lead) and str(lead.get("website") or "").startswith(("https://", "http://")):
             try:
