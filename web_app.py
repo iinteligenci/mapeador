@@ -1289,6 +1289,10 @@ DISTRIBUTORS_PAGE = HISTORY_PAGE.replace(
     '<input type="hidden" name="return_to" value="history">',
     '<input type="hidden" name="return_to" value="distributors">'
 ).replace(
+    'href="/history?group={{ key }}"', 'href="/distributors"'
+).replace(
+    'href="/history?group={{ selected_group }}', 'href="/distributors'
+).replace(
     "Mapeador | Estabelecimentos encontrados", "Mapeador | Distribuidoras"
 ).replace(
     "<h1>Estabelecimentos encontrados</h1>", "<h1>Distribuidoras</h1>"
