@@ -559,8 +559,8 @@ def daily_notifications_loop() -> None:
                 today = datetime.now().astimezone().date().isoformat()
                 ok_routes = _send_routes(today)
                 _ensure_proposals(limit=30)
-                count_4k, ok_4k = _send_proposals("4k", today, 5)
-                count_digital, ok_digital = _send_proposals("digital", today, 5)
+                count_4k, ok_4k = _send_proposals("4k", today, 1)
+                count_digital, ok_digital = _send_proposals("digital", today, 1)
                 if count_4k or count_digital or not ok_routes or not ok_4k or not ok_digital:
                     logging.info(
                         "Mapeador — ciclo WhatsApp: %s propostas 4K, %s de presença digital; rotas verificadas.",
