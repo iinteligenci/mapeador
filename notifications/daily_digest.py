@@ -320,11 +320,18 @@ def _send_routes(today: str) -> bool:
             # Migra notificações antigas: o registro antigo guarda a data do envio,
             # então estabelecimentos cadastrados antes dele são considerados parte
             # da rota já enviada. Os cadastrados depois continuam elegíveis.
-            old_route = conn.execute(
-                "SELECT sent_date, sent_at FROM notification_log WHERE event_key IN (?, ?) "
-                "ORDER BY sent_at DESC LIMIT 1",
-                (route_key, legacy_key),
-            ).fetchone()
+            if neighborhood.casefold().endswith(" — vila velha") and legacy_key != route_key:
+                old_route = conn.execute(
+                    "SELECT sent_date, sent_at FROM notification_log WHERE event_key IN (?, ?) "
+                    "ORDER BY sent_at DESC LIMIT 1",
+                    (route_key, legacy_key),
+                ).fetchone()
+            else:
+                old_route = conn.execute(
+                    "SELECT sent_date, sent_at FROM notification_log WHERE event_key=? "
+                    "ORDER BY sent_at DESC LIMIT 1",
+                    (route_key,),
+                ).fetchone()
             if old_route:
                 sent_at = str(old_route["sent_at"] or "")
                 for place in places:
