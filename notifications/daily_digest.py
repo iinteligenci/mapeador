@@ -463,22 +463,21 @@ def _ensure_proposals(limit: int = 15) -> None:
     proposals = get_proposals(path=_db_path())
     existing = {(int(p.get("lead_id") or 0), str(p.get("profile") or "")) for p in proposals}
     processed = 0
+    checked = 0
     for lead in leads:
         if processed >= limit:
             break
         if lead.get("status") in {"removed", "in_person"} or _is_distributor(lead):
             continue
-        # Try to discover only publicly published contacts on the business's own website.
-        if not _eligible_lead(lead) and str(lead.get("website") or "").startswith(("https://", "http://")):
-            try:
-                contacts = find_public_business_contacts(lead)
-                update_public_contacts(int(lead["id"]), contacts, _db_path())
-                lead.update(contacts)
-                refreshed = next((item for item in get_leads(path=_db_path()) if int(item.get("id") or 0) == int(lead["id"])), None)
-                if refreshed:
-                    lead = refreshed
-            except Exception as contact_exc:
-                logging.info("Contatos públicos indisponíveis para %s: %s", lead.get("name"), contact_exc)
+        checked += 1
+        print(
+            f"Mapeador — preparando propostas: registro {checked}; "
+            f"{lead.get('name') or 'estabelecimento sem nome'}; "
+            f"contato elegível={'sim' if _eligible_lead(lead) else 'não'}.",
+            flush=True,
+        )
+        # Não fazer scraping síncrono de sites nesta rotina manual: ele pode prender o
+        # diagnóstico por muito tempo. O worker de enriquecimento independente já cuida disso.
         if not _eligible_lead(lead):
             continue
         eligible_profiles = ("4k", "digital") if _is_4k_target(lead) else ("digital",)
