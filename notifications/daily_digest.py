@@ -371,7 +371,7 @@ def _send_routes(today: str) -> bool:
                         "",
                     ])
 
-                ok, detail = send_to_group("\\n".join(lines)[:10000])
+                ok, detail = send_to_group("\n".join(lines)[:10000])
                 if not ok:
                     all_ok = False
                     logging.warning("Rota do bairro %s não enviada: %s", neighborhood, detail)
