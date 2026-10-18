@@ -22,7 +22,7 @@ from scraper.maps_scraper import search_google_maps, fetch_place_address
 from scraper.public_contacts import find_public_business_contacts
 from scraper.site_research import research_public_site
 from notifications.whatsapp_self import send_to_self
-from notifications.daily_digest import daily_notifications_loop, send_eligible_routes_now, _neighborhood
+from notifications.daily_digest import daily_notifications_loop, send_eligible_routes_now, _neighborhood, get_notification_schedule, set_notification_schedule
 
 load_dotenv()
 app = Flask(__name__)
@@ -1449,6 +1449,15 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
  <div class="nav-group"><span>COMERCIAL</span><a href="/campaigns">✉ Campanhas</a><a href="/proposals/4k">Propostas 4K</a><a href="/proposals/digital">Propostas presença digital</a></div>
  <div class="nav-group"><span>AUTOMAÇÃO</span><a href="/automatic">⚙ Modo automático</a></div>
 </nav>
+<section class="panel"><h2>Notificações WhatsApp</h2>
+<p class="muted">Escolha se quer receber notificações uma ou várias vezes ao dia. Digite os horários no formato 24 horas, separados por vírgula.</p>
+<form method="post" action="/notifications/schedule">
+<label style="display:flex;align-items:center;gap:10px;margin:10px 0 16px"><input type="checkbox" name="enabled" value="yes" style="width:auto;min-height:0;margin:0" {% if notification_schedule.enabled %}checked{% endif %}> Ativar notificações automáticas</label>
+<label>Horários de envio (HH:MM)</label>
+<input name="times" required value="{{ notification_schedule.times|join(', ') }}" placeholder="09:00, 13:00, 17:30">
+<p class="muted">Exemplo: 09:00, 13:00, 17:30. Em cada horário, o sistema verifica rotas elegíveis e novas propostas disponíveis. Não reenvia a mesma rota ou proposta. Mantém o limite de até 5 propostas por dia para cada perfil.</p>
+<button type="submit">Salvar horários</button>
+</form></section>
 <section class="panel"><h2>Controle da automação</h2><p><strong>Status:</strong> <span style="color:{{ '#35d49a' if settings.enabled else '#ffcc80' }};font-weight:800">{{ 'LIGADO' if settings.enabled else 'DESLIGADO' }}</span></p>
 <form method="post" action="/automatic/toggle" style="display:flex;gap:10px;flex-wrap:wrap">
 <button type="submit" name="enabled" value="yes" style="background:#35d49a">▶ Ligar automação</button>
@@ -1637,7 +1646,7 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
 @app.get("/automatic")
 def automatic_mode():
     settings = get_automation_settings(os.getenv("DATABASE_PATH", "data/mapeador.sqlite3"))
-    return render_template_string(AUTO_PAGE, settings=settings)
+    return render_template_string(AUTO_PAGE, settings=settings, notification_schedule=get_notification_schedule())
 
 
 @app.post("/automatic/toggle")
@@ -1660,6 +1669,17 @@ def automatic_save():
         current = get_automation_settings(db_path)
         set_automation_settings(bool(current.get("enabled")), term, size, db_path)
     except (ValueError, TypeError) as exc:
+        return f"Configuração inválida: {exc}", 400
+    return redirect(url_for("automatic_mode"))
+
+
+@app.post("/notifications/schedule")
+def save_notification_schedule_route():
+    enabled = request.form.get("enabled") == "yes"
+    times_text = (request.form.get("times") or "").strip()
+    try:
+        set_notification_schedule(enabled, times_text)
+    except ValueError as exc:
         return f"Configuração inválida: {exc}", 400
     return redirect(url_for("automatic_mode"))
 
