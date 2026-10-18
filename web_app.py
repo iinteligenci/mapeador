@@ -200,7 +200,7 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
  <div class="brand"><div class="mark">M</div><div><h1>Mapeador</h1><div class="category">Inteligência comercial para negócios alimentícios</div></div></div>
  <p class="sub">Encontre estabelecimentos, investigue sua presença digital e organize oportunidades para revisão humana.</p>
  <nav class="nav" aria-label="Navegação principal">
- <div class="nav-group"><span>PROSPECÇÃO</span><a href="/">＋ Nova prospecção</a><a href="/history">▤ Estabelecimentos</a><a href="/removed">🚫 Removidos</a></div>
+ <div class="nav-group"><span>PROSPECÇÃO</span><a href="/">＋ Nova prospecção</a><a href="/history">▤ Estabelecimentos</a><a href="/distributors">🚚 Distribuidoras</a><a href="/removed">🚫 Removidos</a></div>
  <div class="nav-group"><span>CAMPO</span><a href="/visits">📍 Visitas presenciais</a><a href="/routes">🗺️ Rotas</a></div>
  <div class="nav-group"><span>COMERCIAL</span><a href="/campaigns">✉ Campanhas</a><a href="/proposals/4k">Propostas 4K</a><a href="/proposals/digital">Propostas presença digital</a></div>
  <div class="nav-group"><span>AUTOMAÇÃO</span><a href="/automatic">⚙ Modo automático</a></div>
@@ -336,6 +336,100 @@ def index():
     )
 
 
+# Classificação e limites geográficos da prospecção.
+_CITY_ALIASES = {
+    "vila velha": ("vila velha",),
+    "vitoria": ("vitória", "vitoria"),
+    "cariacica": ("cariacica",),
+    "serra": ("serra",),
+    "viana": ("viana",),
+    "guarapari": ("guarapari",),
+    "fundao": ("fundão", "fundao"),
+    "domingos martins": ("domingos martins",),
+    "marechal floriano": ("marechal floriano",),
+    "aracruz": ("aracruz",),
+    "anchieta": ("anchieta",),
+    "piuma": ("piúma", "piuma"),
+}
+
+
+def _fold_text(value: object) -> str:
+    import unicodedata
+    return re.sub(r"\\s+", " ", unicodedata.normalize("NFKD", str(value or "")).encode("ascii", "ignore").decode("ascii").casefold()).strip()
+
+
+def _city_from_search_term(term: str) -> str:
+    folded = _fold_text(term)
+    # A localidade precisa ser explícita no termo configurado.
+    for canonical in sorted(_CITY_ALIASES, key=len, reverse=True):
+        if re.search(r"\\b" + re.escape(canonical) + r"\\b", folded):
+            return canonical
+    return ""
+
+
+def _lead_city(lead: dict[str, Any]) -> str:
+    address = str(lead.get("address") or lead.get("formatted_address") or "")
+    folded = _fold_text(address)
+    parts = [part.strip() for part in re.split(r"[,|]", folded) if part.strip()]
+    tail = " ".join(parts[-3:])
+    for canonical in sorted(_CITY_ALIASES, key=len, reverse=True):
+        if re.search(r"\\b" + re.escape(canonical) + r"\\b", tail):
+            return canonical
+    return ""
+
+
+def _is_distributor(lead: dict[str, Any]) -> bool:
+    text = _fold_text(f"{lead.get('name', '')} {lead.get('category', '')}")
+    return any(term in text for term in (
+        "distribuidora", "distribuidor", "distribuicao", "atacadista", "atacado",
+        "food service", "foodservice", "atacadão", "atacadao", "fornecedor para restaurantes",
+        "fornecedor de restaurantes", "distribuicao de alimentos"
+    ))
+
+
+def _is_food_consumer_business(lead: dict[str, Any]) -> bool:
+    text = _fold_text(f"{lead.get('name', '')} {lead.get('category', '')}")
+    if _is_distributor(lead):
+        return False
+    excluded = (
+        "racao", "ração", "casa de racoes", "casa de rações", "pet shop", "petshop",
+        "agropecuaria", "agropecuária", "insumos agricolas", "insumos agrícolas",
+        "fabricante", "industria de alimentos", "indústria de alimentos", "frigorifico industrial",
+        "frigorífico industrial", "abatedouro", "avicola industrial", "avícola industrial",
+        "fornecedor industrial", "maquina para alimentos", "máquina para alimentos",
+        "equipamentos para restaurante", "equipamento para restaurante", "embalagens para alimentos"
+    )
+    if any(term in text for term in excluded):
+        return False
+    allowed = (
+        "restaurante", "churrascaria", "self service", "self-service", "bar", "boteco", "pub",
+        "petiscaria", "petiscos", "acougue", "açougue", "casa de carnes", "boutique de carnes",
+        "aviario", "aviário", "frango", "aves e ovos", "casa de frango", "lanchonete",
+        "hamburgueria", "pizzaria", "cantina", "bistro", "bistrô", "cafeteria", "cafe",
+        "café", "padaria", "confeitaria", "doceria", "sorveteria", "peixaria", "pescados",
+        "hortifruti", "hortifrut", "sacolao", "sacolão", "mercearia", "minimercado",
+        "supermercado", "empório", "emporio", "rotisseria", "comida caseira", "marmitaria",
+        "restaurante brasileiro", "mercado"
+    )
+    return any(term in text for term in allowed)
+
+
+def _matches_search_city(lead: dict[str, Any], term: str) -> bool:
+    selected_city = _city_from_search_term(term)
+    if not selected_city:
+        return False
+    found_city = _lead_city(lead)
+    # Se o Maps não entregou um endereço que permita confirmar o município, não salva.
+    return bool(found_city and found_city == selected_city)
+
+
+def _filter_food_results(leads: list[dict[str, Any]], term: str) -> list[dict[str, Any]]:
+    return [
+        lead for lead in leads
+        if _is_food_consumer_business(lead) and _matches_search_city(lead, term)
+    ]
+
+
 @app.post("/search")
 def search():
     term = (request.form.get("term") or "").strip()
@@ -355,8 +449,14 @@ def search():
     db_path = os.getenv("DATABASE_PATH", "data/mapeador.sqlite3")
     init_db(db_path)
     try:
+        city = _city_from_search_term(term)
+        if not city:
+            raise ValueError("Informe o município da pesquisa, por exemplo: restaurantes em Vila Velha ES.")
+        if any(word in _fold_text(term) for word in ("distribuidora", "distribuidor", "atacado", "food service", "foodservice")):
+            raise ValueError("Distribuidoras são pesquisadas exclusivamente na aba Distribuidoras.")
         known_links = {str(item.get("link") or "").split("?")[0].rstrip("/") for item in get_leads(path=db_path)}
-        leads = asyncio.run(search_google_maps(term, limit, exclude_links=known_links))
+        raw_leads = asyncio.run(search_google_maps(term, min(60, limit * 5), exclude_links=known_links))
+        leads = _filter_food_results(raw_leads, term)[:limit]
     except Exception as exc:
         return render_template_string(
             PAGE, term=term, limit=limit, offer=offer, profile=profile, reanalyze=reanalyze, results=[],
@@ -600,19 +700,19 @@ def history():
     selected = (request.args.get("status") or "all").strip()
     if selected not in {"all", "to_visit", "visited", "client"}:
         selected = "all"
-    categories = {"restaurants": "Restaurantes", "bars": "Bares e petiscarias", "distributors": "Distribuidoras", "butchers": "Açougues", "others": "Outros"}
+    categories = {"restaurants": "Restaurantes", "bars": "Bares e petiscarias", "butchers": "Açougues", "others": "Outros"}
     selected_group = (request.args.get("group") or "restaurants").strip()
     if selected_group not in categories:
         selected_group = "restaurants"
     leads = [lead for lead in get_leads(path=db_path) if lead.get("status") not in {"in_person", "removed"}]
+    # Registros de distribuidoras permanecem no banco, mas só aparecem na aba própria.
+    leads = [lead for lead in leads if not _is_distributor(lead)]
     for lead in leads:
         if lead.get("status") not in STATUS_LABELS:
             lead["status"] = "to_visit"
         lead["status_label"] = STATUS_LABELS[lead["status"]]
         searchable = f"{lead.get('name', '')} {lead.get('category', '')}".casefold()
-        if any(term in searchable for term in ("distribuidora", "distribuidor", "distribuicao", "distribuição", "atacadista", "atacado", "food service", "foodservice")):
-            lead["business_group"] = "distributors"
-        elif any(term in searchable for term in ("açougue", "acougue", "casa de carnes", "casa das carnes", "boutique de carnes", "carnes e cortes")):
+        if any(term in searchable for term in ("açougue", "acougue", "casa de carnes", "casa das carnes", "boutique de carnes", "carnes e cortes")):
             lead["business_group"] = "butchers"
         elif any(term in searchable for term in ("petiscaria", "petiscos", "bar e restaurante", "bar restaurante", "bar", "pub", "boteco", "cervejaria")):
             lead["business_group"] = "bars"
@@ -625,6 +725,68 @@ def history():
     leads.sort(key=lambda lead: str(lead.get("name") or "").casefold())
     grouped_leads = {key: [lead for lead in leads if lead["business_group"] == key] for key in categories}
     return render_template_string(HISTORY_PAGE, leads=grouped_leads[selected_group], grouped_leads=grouped_leads, categories=categories, selected=selected, selected_group=selected_group, labels=STATUS_LABELS)
+
+
+@app.get("/distributors")
+def distributors():
+    db_path = os.getenv("DATABASE_PATH", "data/mapeador.sqlite3")
+    init_db(db_path)
+    selected = (request.args.get("status") or "all").strip()
+    if selected not in {"all", "to_visit", "visited", "client"}:
+        selected = "all"
+    leads = [
+        lead for lead in get_leads(path=db_path)
+        if _is_distributor(lead) and lead.get("status") not in {"in_person", "removed"}
+    ]
+    for lead in leads:
+        if lead.get("status") not in STATUS_LABELS:
+            lead["status"] = "to_visit"
+        lead["status_label"] = STATUS_LABELS[lead["status"]]
+    if selected != "all":
+        leads = [lead for lead in leads if lead["status"] == selected]
+    leads.sort(key=lambda lead: str(lead.get("name") or "").casefold())
+    categories = {"distributors": "Distribuidoras"}
+    grouped = {"distributors": leads}
+    return render_template_string(
+        DISTRIBUTORS_PAGE, leads=leads, grouped_leads=grouped, categories=categories,
+        selected=selected, selected_group="distributors", labels=STATUS_LABELS,
+        city=request.args.get("city", "Vila Velha"), limit=5
+    )
+
+
+@app.post("/distributors/search")
+def search_distributors():
+    db_path = os.getenv("DATABASE_PATH", "data/mapeador.sqlite3")
+    city = (request.form.get("city") or "").strip()
+    try:
+        limit = max(1, min(15, int(request.form.get("limit", "5"))))
+    except ValueError:
+        limit = 5
+    if not city or not _city_from_search_term(f"distribuidoras em {city}"):
+        return redirect(url_for("distributors", message="Informe um município válido do Espírito Santo."))
+    term = f"distribuidoras de alimentos em {city} ES"
+    try:
+        known_links = {str(item.get("link") or "").split("?")[0].rstrip("/") for item in get_leads(path=db_path)}
+        raw = asyncio.run(search_google_maps(term, min(60, limit * 5), exclude_links=known_links))
+        leads = [
+            item for item in raw
+            if _is_distributor({**item, "category": f"Distribuidora de alimentos {item.get('category', '')}"})
+            and _matches_search_city(item, term)
+        ][:limit]
+        added = 0
+        for lead in leads:
+            lead["category"] = "Distribuidora de alimentos — " + str(lead.get("category") or "Categoria não identificada")
+            _, inserted = save_lead(lead, db_path)
+            added += int(inserted)
+        message = f"Pesquisa concluída: {added} nova(s) distribuidora(s) adicionada(s)."
+    except Exception as exc:
+        message = f"Falha na pesquisa de distribuidoras: {type(exc).__name__}: {exc}"
+    return redirect(url_for("distributors", message=message, city=city, limit=limit))
+
+
+@app.post("/visits") 
+def visits_placeholder():
+    return redirect(url_for("visits"))
 
 
 @app.get("/visits")
@@ -1126,7 +1288,24 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
 
 REMOVED_PAGE = HISTORY_PAGE.replace("Mapeador | Estabelecimentos encontrados", "Mapeador | Removidos").replace("<h1>Estabelecimentos encontrados</h1>", "<h1>Estabelecimentos removidos</h1>").replace("Seu histórico comercial fica salvo no banco local.", "Lista de locais que você já conhece ou não pode atender. Ficam excluídos da prospecção e das campanhas.").replace("{{ leads|length }} estabelecimento(s) nesta lista", "{{ leads|length }} estabelecimento(s) removido(s)").replace('<div class="filters">', '<div class="filters" style="display:none">')
 
-VISITS_PAGE = HISTORY_PAGE.replace("Mapeador | Estabelecimentos encontrados", "Mapeador | Visitas presenciais").replace("<h1>Estabelecimentos encontrados</h1>", "<h1>Visitas presenciais</h1>").replace("Seu histórico comercial fica salvo no banco local.", "Lista separada de estabelecimentos reservados para abordagem presencial. Não entram nas campanhas nem na lista geral.").replace("{{ leads|length }} estabelecimento(s) nesta lista", "{{ leads|length }} estabelecimento(s) para visita presencial").replace('<div class="filters">', '<div class="filters" style="display:none">')
+VISITS_PAGE = HISTORY_PAGE.replace("Mapeador | Estabelecimentos encontrados", "Mapeador | Visitas presenciais").replace("<h1>Estabelecimentos encontrados</h1>", "<h1>Visitas presenciais</h1>").replace("Seu histórico comercial fica salvo no banco local.", "Lista separada de estabelecimentos reservados para abordagem presencial. Não entram nas campanhas nem na lista geral.").replace("{{ leads|length }} estabelecimento(s) nesta lista", "{{ leads|length }} estabelecimento(s) para visita presencial").replace('<div class="filters">', '<div class="filters" style="display:none">")
+
+DISTRIBUTORS_PAGE = HISTORY_PAGE.replace(
+    "Mapeador | Estabelecimentos encontrados", "Mapeador | Distribuidoras"
+).replace(
+    "<h1>Estabelecimentos encontrados</h1>", "<h1>Distribuidoras</h1>"
+).replace(
+    "Seu histórico comercial fica salvo no banco local.", "Prospecção separada para análise de concorrentes e distribuidores."
+).replace(
+    '<section class="panel"><h2>{{ leads|length }} estabelecimento(s) nesta lista</h2>',
+    '<section class="panel"><h2>Pesquisar distribuidoras</h2><form method="post" action="/distributors/search"><div class="formgrid"><div><label>Município</label><input name="city" value="{{ city or \'Vila Velha\' }}" required placeholder="Ex.: Vila Velha"></div><div><label>Quantidade máxima</label><select name="limit">{% for n in [3,5,10,15] %}<option value="{{n}}" {% if limit == n %}selected{% endif %}>{{n}}</option>{% endfor %}</select></div></div><button type="submit">Iniciar prospecção de distribuidoras</button><p class="hint">Esta pesquisa é manual e independente. Os resultados não aparecem em Estabelecimentos encontrados.</p></form></section><section class="panel"><h2>{{ leads|length }} distribuidora(s) nesta lista</h2>'
+).replace(
+    '<div class="filters category-filters" aria-label="Categorias de estabelecimentos">\n{% for key, label in categories.items() %}<a href="/history?group={{ key }}" class="{{ \'active\' if selected_group == key else \'\' }}">{{ label }} ({{ grouped_leads[key]|length }})</a>{% endfor %}\n</div>',
+    ''
+).replace(
+    '<a href="/history?group={{ selected_group }}" class="{{ \'active\' if selected == \'all\' else \'\' }}">Todos</a>\n<a href="/history?group={{ selected_group }}&status=to_visit" class="{{ \'active\' if selected == \'to_visit\' else \'\' }}">Para visitar</a>\n<a href="/history?group={{ selected_group }}&status=visited" class="{{ \'active\' if selected == \'visited\' else \'\' }}">Visitados</a>\n<a href="/history?group={{ selected_group }}&status=client" class="{{ \'active\' if selected == \'client\' else \'\' }}">Clientes</a>',
+    '<a href="/distributors" class="{{ \'active\' if selected == \'all\' else \'\' }}">Todas</a><a href="/distributors?status=to_visit" class="{{ \'active\' if selected == \'to_visit\' else \'\' }}">Para visitar</a><a href="/distributors?status=visited" class="{{ \'active\' if selected == \'visited\' else \'\' }}">Visitadas</a><a href="/distributors?status=client" class="{{ \'active\' if selected == \'client\' else \'\' }}">Clientes</a>'
+)
 
 CAMPAIGNS_PAGE = r"""
 <!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
