@@ -1975,14 +1975,27 @@ def test_whatsapp_notification():
 
 @app.post("/notifications/run-now")
 def run_proposals_now_route():
-    """Executa um ciclo imediato de análise/envio e apresenta diagnóstico de elegibilidade."""
+    """Dispara o ciclo imediato em segundo plano para a página nunca ficar presa."""
+    def _run_immediate_proposals():
+        try:
+            ok, detail = run_proposals_now()
+            app.logger.info("Execução manual de propostas concluída (%s): %s", "OK" if ok else "ATENÇÃO", detail)
+        except Exception as exc:
+            app.logger.exception("Falha na execução manual de propostas: %s", exc)
+
     try:
-        ok, detail = run_proposals_now()
-        prefix = "OK: " if ok else "ATENÇÃO: "
-        return redirect(url_for("automatic_mode", message=prefix + detail))
+        threading.Thread(
+            target=_run_immediate_proposals,
+            daemon=True,
+            name="mapeador-manual-proposals",
+        ).start()
+        return redirect(url_for(
+            "automatic_mode",
+            message="Execução iniciada em segundo plano. A página continuará responsiva; acompanhe o resultado no terminal do Mapeador."
+        ))
     except Exception as exc:
-        app.logger.exception("Falha ao executar propostas imediatas")
-        return redirect(url_for("automatic_mode", message=f"ERRO: {type(exc).__name__}: {exc}"))
+        app.logger.exception("Não foi possível iniciar a execução manual de propostas")
+        return redirect(url_for("automatic_mode", message=f"ERRO ao iniciar: {type(exc).__name__}: {exc}"))
 
 
 @app.post("/notifications/schedule")
