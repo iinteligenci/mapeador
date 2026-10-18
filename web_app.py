@@ -545,15 +545,6 @@ def generate_proposal():
         error = f"Não foi possível gerar a proposta ({type(exc).__name__}: {exc}). Os dados do estabelecimento continuam salvos."
 
     item = {"lead": lead, "lead_id": lead_id, "research": research, "analyses": analyses, "error": error}
-    if analyses:
-        lines = [f"🧾 MAPEADOR — proposta gerada", f"Empresa: {lead.get('name')}", ""]
-        for key, analysis in analyses.items():
-            label = "4K Food Service" if key == "4k" else "Presença digital"
-            lines.extend([f"{label} (prioridade {analysis.get('score', '?')}/100):", str(analysis.get("mensagem") or ""), ""])
-        lines.append("A proposta foi gerada como rascunho; nenhuma mensagem foi enviada à empresa.")
-        ok, detail = send_to_self("\n".join(lines)[:3500])
-        if not ok:
-            app.logger.info("Notificação de proposta não enviada: %s", detail)
     try:
         page_limit = max(1, min(15, int(request.form.get("limit", "3") or "3")))
     except ValueError:
