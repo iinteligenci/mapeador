@@ -9,6 +9,12 @@ echo A automacao de pesquisas pode ser ligada/desligada no navegador.
 echo ==========================================
 :loop
 echo.
+echo Verificando atualizacoes do GitHub...
+git pull --ff-only
+if errorlevel 1 (
+  echo Nao foi possivel atualizar automaticamente. Vou iniciar a versao local.
+)
+echo.
 echo Iniciando Mapeador...
 py web_app.py
 echo.
