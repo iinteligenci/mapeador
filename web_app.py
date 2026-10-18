@@ -750,7 +750,7 @@ def distributors():
     return render_template_string(
         DISTRIBUTORS_PAGE, leads=leads, grouped_leads=grouped, categories=categories,
         selected=selected, selected_group="distributors", labels=STATUS_LABELS,
-        city=request.args.get("city", "Vila Velha"), limit=5
+        city=request.args.get("city", "Vila Velha"), limit=max(1, min(15, int(request.args.get("limit", "5") or "5"))), message=request.args.get("message", "")
     )
 
 
@@ -770,8 +770,7 @@ def search_distributors():
         raw = asyncio.run(search_google_maps(term, min(60, limit * 5), exclude_links=known_links))
         leads = [
             item for item in raw
-            if _is_distributor({**item, "category": f"Distribuidora de alimentos {item.get('category', '')}"})
-            and _matches_search_city(item, term)
+            if _is_distributor(item) and _matches_search_city(item, term)
         ][:limit]
         added = 0
         for lead in leads:
@@ -782,11 +781,6 @@ def search_distributors():
     except Exception as exc:
         message = f"Falha na pesquisa de distribuidoras: {type(exc).__name__}: {exc}"
     return redirect(url_for("distributors", message=message, city=city, limit=limit))
-
-
-@app.post("/visits") 
-def visits_placeholder():
-    return redirect(url_for("visits"))
 
 
 @app.get("/visits")
@@ -1013,7 +1007,7 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
 </style></head><body><main>
 <header><div class="brand"><div class="mark">M</div><div><h1>Estabelecimentos encontrados</h1><div class="muted">Seu histórico comercial fica salvo no banco local.</div></div></div>
 <nav class="nav" aria-label="Navegação principal">
- <div class="nav-group"><span>PROSPECÇÃO</span><a href="/">＋ Nova prospecção</a><a href="/history">▤ Estabelecimentos</a><a href="/removed">🚫 Removidos</a></div>
+ <div class="nav-group"><span>PROSPECÇÃO</span><a href="/">＋ Nova prospecção</a><a href="/history">▤ Estabelecimentos</a><a href="/distributors">🚚 Distribuidoras</a><a href="/removed">🚫 Removidos</a></div>
  <div class="nav-group"><span>CAMPO</span><a href="/visits">📍 Visitas presenciais</a><a href="/routes">🗺️ Rotas</a></div>
  <div class="nav-group"><span>COMERCIAL</span><a href="/campaigns">✉ Campanhas</a><a href="/proposals/4k">Propostas 4K</a><a href="/proposals/digital">Propostas presença digital</a></div>
  <div class="nav-group"><span>AUTOMAÇÃO</span><a href="/automatic">⚙ Modo automático</a></div>
@@ -1243,7 +1237,7 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
 </style></head><body><main>
 <h1>🗺️ Rotas de visitas presenciais</h1><p class="muted">Estabelecimentos marcados como “Visita presencial”, organizados por bairro. Clique em um bairro para abrir a lista de locais.</p>
 <nav class="nav" aria-label="Navegação principal">
- <div class="nav-group"><span>PROSPECÇÃO</span><a href="/">＋ Nova prospecção</a><a href="/history">▤ Estabelecimentos</a><a href="/removed">🚫 Removidos</a></div>
+ <div class="nav-group"><span>PROSPECÇÃO</span><a href="/">＋ Nova prospecção</a><a href="/history">▤ Estabelecimentos</a><a href="/distributors">🚚 Distribuidoras</a><a href="/removed">🚫 Removidos</a></div>
  <div class="nav-group"><span>CAMPO</span><a href="/visits">📍 Visitas presenciais</a><a href="/routes">🗺️ Rotas</a></div>
  <div class="nav-group"><span>COMERCIAL</span><a href="/campaigns">✉ Campanhas</a><a href="/proposals/4k">Propostas 4K</a><a href="/proposals/digital">Propostas presença digital</a></div>
  <div class="nav-group"><span>AUTOMAÇÃO</span><a href="/automatic">⚙ Modo automático</a></div>
@@ -1298,7 +1292,7 @@ DISTRIBUTORS_PAGE = HISTORY_PAGE.replace(
     "Seu histórico comercial fica salvo no banco local.", "Prospecção separada para análise de concorrentes e distribuidores."
 ).replace(
     '<section class="panel"><h2>{{ leads|length }} estabelecimento(s) nesta lista</h2>',
-    '<section class="panel"><h2>Pesquisar distribuidoras</h2><form method="post" action="/distributors/search"><div class="formgrid"><div><label>Município</label><input name="city" value="{{ city or \'Vila Velha\' }}" required placeholder="Ex.: Vila Velha"></div><div><label>Quantidade máxima</label><select name="limit">{% for n in [3,5,10,15] %}<option value="{{n}}" {% if limit == n %}selected{% endif %}>{{n}}</option>{% endfor %}</select></div></div><button type="submit">Iniciar prospecção de distribuidoras</button><p class="hint">Esta pesquisa é manual e independente. Os resultados não aparecem em Estabelecimentos encontrados.</p></form></section><section class="panel"><h2>{{ leads|length }} distribuidora(s) nesta lista</h2>'
+    '<section class="panel">{% if message %}<div class="alert {{ 'success' if message.startswith('Pesquisa concluída:') else '' }}">{{ message }}</div>{% endif %}<h2>Pesquisar distribuidoras</h2><form method="post" action="/distributors/search"><div class="formgrid"><div><label>Município</label><input name="city" value="{{ city or \'Vila Velha\' }}" required placeholder="Ex.: Vila Velha"></div><div><label>Quantidade máxima</label><select name="limit">{% for n in [3,5,10,15] %}<option value="{{n}}" {% if limit == n %}selected{% endif %}>{{n}}</option>{% endfor %}</select></div></div><button type="submit">Iniciar prospecção de distribuidoras</button><p class="hint">Esta pesquisa é manual e independente. Os resultados não aparecem em Estabelecimentos encontrados.</p></form></section><section class="panel"><h2>{{ leads|length }} distribuidora(s) nesta lista</h2>'
 ).replace(
     '<div class="filters category-filters" aria-label="Categorias de estabelecimentos">\n{% for key, label in categories.items() %}<a href="/history?group={{ key }}" class="{{ \'active\' if selected_group == key else \'\' }}">{{ label }} ({{ grouped_leads[key]|length }})</a>{% endfor %}\n</div>',
     ''
@@ -1408,7 +1402,7 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
 @media(max-width:390px){.nav-group{grid-template-columns:1fr!important}.nav-group>span{grid-column:1!important}.stats{grid-template-columns:1fr!important}}
 
 </style></head><body><main><h1>Central de campanhas</h1><p class="muted">Você cria e revisa a mensagem. A abertura do WhatsApp é manual; nada é enviado automaticamente.</p><nav class="nav" aria-label="Navegação principal">
- <div class="nav-group"><span>PROSPECÇÃO</span><a href="/">＋ Nova prospecção</a><a href="/history">▤ Estabelecimentos</a><a href="/removed">🚫 Removidos</a></div>
+ <div class="nav-group"><span>PROSPECÇÃO</span><a href="/">＋ Nova prospecção</a><a href="/history">▤ Estabelecimentos</a><a href="/distributors">🚚 Distribuidoras</a><a href="/removed">🚫 Removidos</a></div>
  <div class="nav-group"><span>CAMPO</span><a href="/visits">📍 Visitas presenciais</a><a href="/routes">🗺️ Rotas</a></div>
  <div class="nav-group"><span>COMERCIAL</span><a href="/campaigns">✉ Campanhas</a><a href="/proposals/4k">Propostas 4K</a><a href="/proposals/digital">Propostas presença digital</a></div>
  <div class="nav-group"><span>AUTOMAÇÃO</span><a href="/automatic">⚙ Modo automático</a></div>
@@ -1665,7 +1659,7 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
 </style></head><body><main>
 <h1>Modo automático</h1><p class="muted">O Mapeador pode pesquisar negócios, complementar dados públicos e criar rascunhos separados para cada canal de contato e para cada empresa. O computador e o Mapeador precisam permanecer ligados.</p>
 <nav class="nav" aria-label="Navegação principal">
- <div class="nav-group"><span>PROSPECÇÃO</span><a href="/">＋ Nova prospecção</a><a href="/history">▤ Estabelecimentos</a><a href="/removed">🚫 Removidos</a></div>
+ <div class="nav-group"><span>PROSPECÇÃO</span><a href="/">＋ Nova prospecção</a><a href="/history">▤ Estabelecimentos</a><a href="/distributors">🚚 Distribuidoras</a><a href="/removed">🚫 Removidos</a></div>
  <div class="nav-group"><span>CAMPO</span><a href="/visits">📍 Visitas presenciais</a><a href="/routes">🗺️ Rotas</a></div>
  <div class="nav-group"><span>COMERCIAL</span><a href="/campaigns">✉ Campanhas</a><a href="/proposals/4k">Propostas 4K</a><a href="/proposals/digital">Propostas presença digital</a></div>
  <div class="nav-group"><span>AUTOMAÇÃO</span><a href="/automatic">⚙ Modo automático</a></div>
@@ -1810,7 +1804,7 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent)!important;o
 
 </style></head><body><main>
 <h1>Propostas priorizadas por IA</h1><nav class="nav" aria-label="Navegação principal">
- <div class="nav-group"><span>PROSPECÇÃO</span><a href="/">＋ Nova prospecção</a><a href="/history">▤ Estabelecimentos</a><a href="/removed">🚫 Removidos</a></div>
+ <div class="nav-group"><span>PROSPECÇÃO</span><a href="/">＋ Nova prospecção</a><a href="/history">▤ Estabelecimentos</a><a href="/distributors">🚚 Distribuidoras</a><a href="/removed">🚫 Removidos</a></div>
  <div class="nav-group"><span>CAMPO</span><a href="/visits">📍 Visitas presenciais</a><a href="/routes">🗺️ Rotas</a></div>
  <div class="nav-group"><span>COMERCIAL</span><a href="/campaigns">✉ Campanhas</a><a href="/proposals/4k">Propostas 4K</a><a href="/proposals/digital">Propostas presença digital</a></div>
  <div class="nav-group"><span>AUTOMAÇÃO</span><a href="/automatic">⚙ Modo automático</a></div>
@@ -2056,21 +2050,40 @@ def _background_research_loop() -> None:
                 try:
                     base_term = settings.get("search_term") or "restaurantes em Vila Velha ES"
                     batch_size = int(settings.get("batch_size") or 3)
-                    # Gemini plans targeted search formulations; each result is verified by Maps.
-                    search_queries = plan_deep_searches(base_term, limit=4)
+                    selected_city = _city_from_search_term(base_term)
+                    if not selected_city:
+                        raise ValueError("A configuração automática precisa conter um município do Espírito Santo.")
+                    city_label = next((name for name, aliases in {
+                        "Vila Velha": ("vila velha",), "Vitória": ("vitoria",), "Cariacica": ("cariacica",),
+                        "Serra": ("serra",), "Viana": ("viana",), "Guarapari": ("guarapari",),
+                        "Fundão": ("fundao",), "Domingos Martins": ("domingos martins",),
+                        "Marechal Floriano": ("marechal floriano",), "Aracruz": ("aracruz",),
+                        "Anchieta": ("anchieta",), "Piúma": ("piuma",)
+                    }.items() if _fold_text(name) == selected_city), selected_city.title())
+                    # Only consumer-facing food businesses; distributor searches live in their own tab.
+                    search_types = [
+                        "restaurantes", "bares e petiscarias", "açougues e casas de carnes",
+                        "aviários e casas de frango", "lanchonetes e hamburguerias",
+                        "peixarias", "padarias e confeitarias", "hortifrutis e mercearias",
+                        "pizzarias e churrascarias", "cafeterias e empórios alimentícios"
+                    ]
                     found_count = 0
-                    print(f"Mapeador automático — iniciando busca: {base_term} | lote de até {batch_size} novos estabelecimentos.")
-                    for query in search_queries:
+                    print(f"Mapeador automático — cidade fixa: {city_label} | público: alimentação para consumidor final | lote de até {batch_size}.")
+                    for business_type in search_types:
                         if found_count >= batch_size:
                             break
+                        query = f"{business_type} em {city_label} ES"
                         print(f"Mapeador automático — pesquisando no Google Maps: {query}")
                         try:
-                            found = asyncio.run(search_google_maps(
-                                query, max(1, batch_size - found_count), exclude_links=known_links))
-                            print(f"Mapeador automático — consulta concluída: {len(found)} resultado(s) novo(s) potencial(is).")
+                            raw_found = asyncio.run(search_google_maps(
+                                query, min(60, max(10, (batch_size - found_count) * 5)), exclude_links=known_links))
+                            found = _filter_food_results(raw_found, query)
+                            print(f"Mapeador automático — {len(found)} resultado(s) elegível(is) após filtro de município e tipo.")
                             for new_lead in found:
-                                lead_id, inserted = save_lead(new_lead, db_path)
                                 normalized = str(new_lead.get("link") or "").split("?")[0].rstrip("/")
+                                if not normalized or normalized in known_links:
+                                    continue
+                                lead_id, inserted = save_lead(new_lead, db_path)
                                 known_links.add(normalized)
                                 if inserted:
                                     found_count += 1
@@ -2086,7 +2099,7 @@ def _background_research_loop() -> None:
                 records = get_leads(path=db_path)
                 processed = 0
                 for saved in records:
-                    if saved.get("status") in {"removed", "in_person"}:
+                    if saved.get("status") in {"removed", "in_person"} or _is_distributor(saved):
                         continue
                     checked_text = saved.get("contact_checked_at") or ""
                     try:
