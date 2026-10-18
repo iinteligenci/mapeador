@@ -22,7 +22,7 @@ from scraper.maps_scraper import search_google_maps, fetch_place_address
 from scraper.public_contacts import find_public_business_contacts
 from scraper.site_research import research_public_site
 from notifications.whatsapp_self import send_to_self
-from notifications.daily_digest import daily_notifications_loop, send_eligible_routes_now
+from notifications.daily_digest import daily_notifications_loop, send_eligible_routes_now, _neighborhood
 
 load_dotenv()
 app = Flask(__name__)
@@ -627,51 +627,12 @@ def routes():
     db_path = os.getenv("DATABASE_PATH", "data/mapeador.sqlite3")
     init_db(db_path)
     leads = [lead for lead in get_leads(path=db_path) if lead.get("status") == "in_person"]
-    # Google Maps often formats addresses as "... , 353 - Praia da Costa, Vila Velha - ES".
-    # Strip the street/building number prefix so all locations in the same neighborhood group together.
-    # Canonical neighborhood names merge variants from Maps such as "Lj 03 - Gaivotas".
-    neighborhood_aliases = [
-        ("Praia da Costa", ("praia da costa",)),
-        ("Itapuã", ("itapuã", "itapua")),
-        ("Praia de Itaparica", ("praia de itaparica",)),
-        ("Coqueiral de Itaparica", ("coqueiral de itaparica", "coqueiral")),
-        ("Praia das Gaivotas", ("praia das gaivotas", "gaivotas")),
-        ("Ataíde", ("ataíde", "ataide")),
-        ("Nossa Senhora da Penha", ("nossa sra. da penha", "nossa sra da penha", "nossa senhora da penha")),
-        ("Centro de Vila Velha", ("centro de vila velha", "centro",)),
-        ("Divino Espírito Santo", ("divino espírito santo", "divino espirito santo")),
-        ("Glória", ("glória", "gloria")),
-        ("Soteco", ("soteco",)),
-        ("Jaburuna", ("jaburuna",)),
-        ("Cobilândia", ("cobilândia", "cobilandia")),
-        ("Terra Vermelha", ("terra vermelha",)),
-        ("Barramares", ("barramares",)),
-        ("Industrial", ("industrial",)),
-    ]
+    # Usa o mesmo agrupador das notificações: bairro e município são separados juntos.
+    # Assim, bairros homônimos em cidades diferentes não caem na mesma rota.
     groups_by_name = {}
     for lead in leads:
-        address = (lead.get("address") or "").strip()
-        parts = [part.strip() for part in address.split(",") if part.strip()]
-        searchable = []
-        for part in parts:
-            normalized = re.sub(r"^(?:(?:loja|lj|quiosque|box|sala)\s*)?\d+\s*[-–:]\s*", "", part, flags=re.IGNORECASE).strip()
-            normalized = re.sub(r"^(?:loja|lj|quiosque|box|sala)\s+\d+\s+", "", normalized, flags=re.IGNORECASE).strip()
-            normalized = re.sub(r"^[\s\-–,:]+", "", normalized).strip()
-            searchable.append(normalized.casefold())
-        full_address = " ".join(searchable)
-        neighborhood = ""
-        for canonical, aliases in neighborhood_aliases:
-            if any(alias in full_address for alias in aliases):
-                neighborhood = canonical
-                break
-        if not neighborhood and len(parts) >= 3:
-            candidate = re.sub(r"^[\s\-–,:]+", "", parts[-3]).strip()
-            candidate = re.sub(r"^(?:(?:loja|lj|quiosque|box|sala)\s*)?\d+\s*[-–:]\s*", "", candidate, flags=re.IGNORECASE).strip()
-            if candidate.casefold() not in {"brasil", "brazil", "espírito santo", "es", "vila velha"}:
-                neighborhood = candidate
-        if not neighborhood:
-            neighborhood = "Bairro não identificado"
-        key = re.sub(r"\s+", " ", neighborhood).strip().casefold()
+        neighborhood = _neighborhood(lead)
+        key = re.sub(r"\\s+", " ", neighborhood).strip().casefold()
         groups_by_name.setdefault(key, {"name": neighborhood, "leads": []})["leads"].append(lead)
     groups = [{"name": group["name"], "leads": sorted(group["leads"], key=lambda lead: (lead.get("name") or "").casefold())}
               for group in sorted(groups_by_name.values(), key=lambda item: item["name"].casefold())]
