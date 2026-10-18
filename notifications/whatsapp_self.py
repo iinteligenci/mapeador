@@ -63,32 +63,63 @@ def send_to_group(message: str, group_name: str | None = None) -> tuple[bool, st
             if not page.url.startswith("https://web.whatsapp.com"):
                 page.goto("https://web.whatsapp.com/", wait_until="domcontentloaded", timeout=60000)
 
-            # Aguarda pelo estado real da página: o WhatsApp muda seus seletores com frequência.
-            # A busca pode ser um input ou um elemento contenteditable, conforme a versão da interface.
+            # A interface do WhatsApp muda os textos e seletores entre versões/idiomas.
+            # Detectamos a lista por vários marcadores de DOM, e o QR separadamente.
             try:
-                page.locator("body").wait_for(state="visible", timeout=15000)
+                page.locator("body").wait_for(state="visible", timeout=20000)
                 page.wait_for_function(
                     """() => {
-                        const text = (document.body?.innerText || '').toLowerCase();
-                        return text.includes('pesquisar ou começar uma nova conversa')
-                            || text.includes('search or start new chat')
-                            || text.includes('escaneie o código qr')
-                            || text.includes('scan the qr code')
-                            || !!document.querySelector('canvas[aria-label*="QR"], [data-testid="qrcode"]');
+                        const body = document.body;
+                        const text = (body?.innerText || '').toLowerCase();
+                        const conversationList = !!(
+                            document.querySelector('#pane-side') ||
+                            document.querySelector('[data-testid="chat-list"]') ||
+                            document.querySelector('[data-testid="chatlist"]') ||
+                            document.querySelector('[aria-label="Lista de conversas"]') ||
+                            document.querySelector('[aria-label="Chat list"]') ||
+                            document.querySelector('div[role="grid"]')
+                        );
+                        const searchBox = !!(
+                            document.querySelector('input[placeholder*="Pesquisar"]') ||
+                            document.querySelector('input[placeholder*="Search"]') ||
+                            document.querySelector('[contenteditable="true"][data-tab="3"]') ||
+                            document.querySelector('[aria-label*="Pesquisar ou começar"]') ||
+                            document.querySelector('[aria-label*="Search or start"]')
+                        );
+                        const qr = !!(
+                            document.querySelector('canvas[aria-label*="QR"]') ||
+                            document.querySelector('[data-testid="qrcode"]') ||
+                            document.querySelector('[data-ref] canvas')
+                        ) || text.includes('escaneie o código qr')
+                          || text.includes('scan the qr code')
+                          || text.includes('use whatsapp on your phone');
+                        const loggedInText = text.includes('pesquisar ou começar uma nova conversa')
+                            || text.includes('search or start new chat');
+                        return (conversationList && (searchBox || body?.innerText?.length > 0))
+                            || loggedInText
+                            || qr;
                     }""",
                     timeout=45000
                 )
-            except Exception:
+            except Exception as exc:
                 try:
                     Path("data").mkdir(parents=True, exist_ok=True)
                     page.screenshot(path="data/whatsapp_load_error.png", full_page=True)
+                    diagnostic = (page.locator("body").inner_text(timeout=3000) or "")[:500].replace("\\n", " ")
+                    Path("data/whatsapp_load_error.txt").write_text(
+                        f"url={page.url}\\ntitle={page.title()}\\nerror={type(exc).__name__}: {exc}\\nbody={diagnostic}",
+                        encoding="utf-8"
+                    )
                 except Exception:
-                    pass
+                    diagnostic = ""
                 _last_failure_at = time.monotonic()
                 _last_failure_message = (
-                    "WhatsApp Web abriu, mas não mostrou a lista de conversas nem a autenticação. "
-                    "A janela foi mantida aberta; veja data/whatsapp_load_error.png."
+                    "A janela de automação não detectou a lista de conversas nem um QR de login. "
+                    "Confira data/whatsapp_load_error.png e data/whatsapp_load_error.txt. "
+                    "Importante: a automação usa o perfil separado data/whatsapp_profile; "
+                    "estar conectado em outra janela normal do Chrome não conecta esse perfil automaticamente."
                 )
+                logging.warning("%s URL=%s título=%s corpo=%s", _last_failure_message, page.url, page.title(), diagnostic)
                 return False, _last_failure_message
 
             body_text = (page.locator("body").inner_text(timeout=10000) or "").casefold()
