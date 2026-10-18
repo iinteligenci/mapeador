@@ -98,33 +98,114 @@ def _whatsapp(lead: dict) -> str:
     return "+" + digits if 12 <= len(digits) <= 13 else ""
 
 
+def _fold(value: str) -> str:
+    """Normaliza texto para comparar cidades e bairros sem depender de acentos."""
+    import unicodedata
+    return re.sub(r"\s+", " ", unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii").casefold()).strip()
+
+
+def _city_from_address(address: str) -> str:
+    """Reconhece municípios da Grande Vitória e cidades próximas em endereços do Maps."""
+    cities = {
+        "Vitoria": ("vitoria",),
+        "Vila Velha": ("vila velha",),
+        "Cariacica": ("cariacica",),
+        "Serra": ("serra",),
+        "Viana": ("viana",),
+        "Guarapari": ("guarapari",),
+        "Fundao": ("fundao",),
+        "Domingos Martins": ("domingos martins",),
+        "Marechal Floriano": ("marechal floriano",),
+        "Santa Leopoldina": ("santa leopoldina",),
+        "Aracruz": ("aracruz",),
+        "Joao Neiva": ("joao neiva",),
+        "Anchieta": ("anchieta",),
+        "Iconha": ("iconha",),
+        "Piuna": ("piuna",),
+    }
+    folded = _fold(address)
+    for canonical, variants in cities.items():
+        if any(re.search(r"\b" + re.escape(variant) + r"\b", folded) for variant in variants):
+            return canonical
+    return ""
+
+
 def _neighborhood(lead: dict) -> str:
+    """Retorna bairro + município, evitando juntar bairros homônimos de cidades diferentes."""
     address = re.sub(r"\s+", " ", str(lead.get("address") or "")).strip()
-    low = address.casefold()
+    folded = _fold(address)
+    city = _city_from_address(address)
+
     aliases = [
         ("Praia da Costa", ("praia da costa",)),
-        ("Itapuã", ("itapuã", "itapua")),
+        ("Itapua", ("itapua",)),
         ("Praia de Itaparica", ("praia de itaparica",)),
-        ("Coqueiral de Itaparica", ("coqueiral de itaparica", "coqueiral")),
+        ("Coqueiral de Itaparica", ("coqueiral de itaparica",)),
         ("Praia das Gaivotas", ("praia das gaivotas", "gaivotas")),
-        ("Ataíde", ("ataíde", "ataide")),
+        ("Ataide", ("ataide",)),
         ("Nossa Senhora da Penha", ("nossa sra. da penha", "nossa sra da penha", "nossa senhora da penha")),
-        ("Centro de Vila Velha", ("centro de vila velha",)),
-        ("Divino Espírito Santo", ("divino espírito santo", "divino espirito santo")),
-        ("Glória", ("glória", "gloria")),
+        ("Centro", ("centro",)),
+        ("Divino Espirito Santo", ("divino espirito santo",)),
+        ("Gloria", ("gloria",)),
         ("Soteco", ("soteco",)),
+        ("Praia do Canto", ("praia do canto",)),
+        ("Jardim da Penha", ("jardim da penha",)),
+        ("Jardim Camburi", ("jardim camburi",)),
+        ("Mata da Praia", ("mata da praia",)),
+        ("Bento Ferreira", ("bento ferreira",)),
+        ("Enseada do Sua", ("enseada do sua",)),
+        ("Goiabeiras", ("goiabeiras",)),
+        ("Maruipe", ("maruipe",)),
+        ("Itarare", ("itarare",)),
+        ("Laranjeiras", ("laranjeiras",)),
+        ("Jacaraipe", ("jacaraipe",)),
+        ("Morada de Laranjeiras", ("morada de laranjeiras",)),
+        ("Feu Rosa", ("feu rosa",)),
+        ("Barcelona", ("barcelona",)),
+        ("Carapina", ("carapina",)),
+        ("Campo Grande", ("campo grande",)),
+        ("Itaciba", ("itaciba",)),
+        ("Jardim America", ("jardim america",)),
+        ("Alto Lage", ("alto lage",)),
+        ("Praia do Morro", ("praia do morro",)),
+        ("Muquicaba", ("muquicaba",)),
+        ("Meaipe", ("meaipe",)),
+        ("Marcilio de Noronha", ("marcilio de noronha",)),
+        ("Praia Grande", ("praia grande",)),
     ]
+    neighborhood = ""
     for canonical, needles in aliases:
-        if any(needle in low for needle in needles):
-            return canonical
-    parts = [part.strip() for part in address.split(",") if part.strip()]
-    if len(parts) >= 3:
-        candidate = re.sub(r"^[\s\-–,:]+", "", parts[-3]).strip()
-        candidate = re.sub(r"^(?:(?:loja|lj|quiosque|box|sala)\s*)?\d+\s*[-–:]\s*", "", candidate, flags=re.I).strip()
-        if candidate.casefold() not in {"brasil", "brazil", "espírito santo", "es", "vila velha"}:
-            return candidate
-    return "Bairro não identificado"
+        if any(re.search(r"\b" + re.escape(_fold(needle)) + r"\b", folded) for needle in needles):
+            neighborhood = canonical
+            break
 
+    parts = [part.strip() for part in address.split(",") if part.strip()]
+    if not neighborhood:
+        # Endereços do Maps variam: "Rua X - Bairro, Cidade - ES" ou
+        # "Rua X, Bairro, Cidade, CEP, Brasil". Prioriza o segmento anterior à cidade.
+        city_index = next((i for i, part in enumerate(parts) if city and re.search(r"\b" + re.escape(_fold(city)) + r"\b", _fold(part))), -1)
+        candidates = []
+        if city_index > 0:
+            candidates.append(parts[city_index - 1])
+            if city_index > 1:
+                candidates.append(parts[city_index - 2])
+        elif len(parts) >= 3:
+            candidates.append(parts[-3])
+        for candidate in candidates:
+            candidate = re.sub(r"^(?:rua|r\.|avenida|av\.|rodovia|rod\.|estrada|travessa|tv\.)\s+", "", candidate, flags=re.I).strip()
+            candidate = re.split(r"\s+[-–]\s+", candidate)[-1].strip()
+            candidate = re.sub(r"^(?:(?:loja|lj|quiosque|box|sala)\s*)?\d+\s*[-–:]\s*", "", candidate, flags=re.I).strip()
+            candidate_folded = _fold(candidate)
+            if candidate and candidate_folded not in {
+                "brasil", "brazil", "espirito santo", "es", "vila velha", "vitoria",
+                "cariacica", "serra", "viana", "guarapari", "fundao", "domingos martins",
+            } and not re.search(r"\b\d{5}-?\d{3}\b", candidate):
+                neighborhood = candidate
+                break
+
+    if not neighborhood:
+        return "Bairro não identificado" + (f" — {city}" if city else "")
+    return f"{neighborhood} — {city}" if city else neighborhood
 
 def _send_routes(today: str) -> bool:
     leads = [item for item in get_leads(path=_db_path()) if item.get("status") == "in_person"]
@@ -137,7 +218,9 @@ def _send_routes(today: str) -> bool:
         if len(places) <= 10 or neighborhood == "Bairro não identificado":
             continue
         event_key = "route:" + neighborhood.casefold()
-        if _was_sent(event_key):
+        legacy_key = "route:" + neighborhood.split(" — ", 1)[0].casefold()
+        # Compatibilidade: não reenviar bairro já notificado antes da separação por cidade.
+        if _was_sent(event_key) or (legacy_key != event_key and _was_sent(legacy_key)):
             continue
         lines = [
             f"🗺️ ROTA DE VISITAS — {neighborhood.upper()}",
