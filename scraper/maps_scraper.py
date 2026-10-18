@@ -145,7 +145,8 @@ async def search_google_maps(term: str, limit: int = 10, exclude_links: set[str]
                         continue
                 return ""
 
-            # Enrich a small batch only; the list view itself remains useful if detail pages stall.\n            for lead in candidates[:min(limit, 5)]:
+            # Enrich a small batch only; the list view itself remains useful if detail pages stall.
+            for lead in candidates[:min(limit, 5)]:
                 try:
                     if not await _goto_with_retries(page, lead["link"], timeout=12000):
                         results.append(lead)
