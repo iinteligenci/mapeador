@@ -134,7 +134,7 @@ def _send_routes(today: str) -> bool:
         groups.setdefault(name, []).append(lead)
     all_ok = True
     for neighborhood, places in sorted(groups.items(), key=lambda item: item[0].casefold()):
-        if len(places) <= 10:
+        if len(places) <= 10 or neighborhood == "Bairro não identificado":
             continue
         event_key = "route:" + neighborhood.casefold()
         if _was_sent(event_key):
