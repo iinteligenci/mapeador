@@ -22,6 +22,7 @@ from scraper.maps_scraper import search_google_maps, fetch_place_address
 from scraper.public_contacts import find_public_business_contacts
 from scraper.site_research import research_public_site
 from notifications.whatsapp_self import send_to_self
+from notifications.daily_digest import daily_notifications_loop
 
 load_dotenv()
 app = Flask(__name__)
@@ -1970,6 +1971,7 @@ def _open_browser() -> None:
 if __name__ == "__main__":
     init_db()
     threading.Thread(target=_background_research_loop, daemon=True, name="mapeador-public-research").start()
+    threading.Thread(target=daily_notifications_loop, daemon=True, name="mapeador-daily-whatsapp").start()
     if os.getenv("RENDER") != "true":
         threading.Timer(1.0, _open_browser).start()
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", "5000")), debug=False)
