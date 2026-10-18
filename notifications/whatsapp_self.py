@@ -63,7 +63,9 @@ def send_to_group(message: str, group_name: str | None = None) -> tuple[bool, st
                     # Clique apenas no resultado com o nome exato do grupo.
                     exact_results = page.get_by_text(group, exact=True)
                     if exact_results.count() == 0:
-                        return False, f"Não encontrei um chat com o nome exato '{group}'."
+                        _last_failure_at = time.monotonic()
+                        _last_failure_message = f"Não encontrei um chat com o nome exato '{group}'."
+                        return False, _last_failure_message
                     exact_results.last.click(timeout=15000)
                     page.wait_for_timeout(800)
 
@@ -78,13 +80,17 @@ def send_to_group(message: str, group_name: str | None = None) -> tuple[bool, st
                         except Exception:
                             pass
                     if group.casefold() not in {value.casefold() for value in title_values}:
-                        return False, f"Não consegui confirmar que o chat aberto é '{group}'. Nada foi enviado."
+                        _last_failure_at = time.monotonic()
+                        _last_failure_message = f"Não consegui confirmar que o chat aberto é '{group}'. Nada foi enviado."
+                        return False, _last_failure_message
 
                     composer = page.locator('footer div[contenteditable="true"]').last
                     composer.wait_for(timeout=15000)
                     composer.fill(message[:10000])
                     composer.press("Enter")
                     page.wait_for_timeout(1000)
+                    _last_failure_at = 0.0
+                    _last_failure_message = ""
                     return True, f"Mensagem enviada ao grupo '{group}'."
                 finally:
                     context.close()
