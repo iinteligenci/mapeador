@@ -5,7 +5,8 @@ import logging
 import os
 import time
 from pathlib import Path
-from threading import Lock
+from threading import Event, Lock, Thread
+from queue import Queue
 
 from playwright.sync_api import sync_playwright
 
@@ -15,6 +16,9 @@ _last_failure_message = ""
 _playwright_instance = None
 _context = None
 _page = None
+_send_queue: Queue = Queue()
+_sender_thread = None
+_sender_start_lock = Lock()
 
 
 def _open_context(playwright):
@@ -230,8 +234,8 @@ def _find_composer(page):
     ])
 
 
-def send_to_group(message: str, group_name: str | None = None) -> tuple[bool, str]:
-    """Envia UMA mensagem ao grupo configurado e confirma que o campo foi limpo."""
+def _send_to_group_impl(message: str, group_name: str | None = None) -> tuple[bool, str]:
+    """Envia UMA mensagem ao grupo; esta função roda somente na thread proprietária do Playwright."""
     group = (group_name or os.getenv("WHATSAPP_GROUP_NAME", "Leads")).strip()
     if not message.strip():
         return False, "Mensagem vazia."
@@ -333,6 +337,45 @@ def send_to_group(message: str, group_name: str | None = None) -> tuple[bool, st
             _last_failure_at = time.monotonic()
             _last_failure_message = f"Falha no WhatsApp Web ({type(exc).__name__}: {exc})."
             return False, _last_failure_message
+
+
+def _sender_worker() -> None:
+    """Mantém todo o Playwright em uma única thread, evitando erros de troca de thread."""
+    while True:
+        job = _send_queue.get()
+        if job is None:
+            _send_queue.task_done()
+            break
+        message, group_name, done, result = job
+        try:
+            result["value"] = _send_to_group_impl(message, group_name)
+        except Exception as exc:
+            logging.exception("Falha no trabalhador de envio WhatsApp")
+            result["value"] = (False, f"Falha no trabalhador WhatsApp ({type(exc).__name__}: {exc}).")
+        finally:
+            done.set()
+            _send_queue.task_done()
+
+
+def send_to_group(message: str, group_name: str | None = None) -> tuple[bool, str]:
+    """Enfileira o envio para que uma única thread controle o navegador do WhatsApp."""
+    global _sender_thread
+    with _sender_start_lock:
+        if _sender_thread is None or not _sender_thread.is_alive():
+            _sender_thread = Thread(
+                target=_sender_worker,
+                daemon=True,
+                name="mapeador-whatsapp-sender",
+            )
+            _sender_thread.start()
+
+    done = Event()
+    result: dict = {}
+    _send_queue.put((message, group_name, done, result))
+    # O envio pode precisar aguardar a abertura do WhatsApp ou autenticação.
+    if not done.wait(timeout=150):
+        return False, "O envio ao WhatsApp excedeu 150 segundos. Verifique a janela do WhatsApp Web."
+    return result.get("value", (False, "O trabalhador WhatsApp terminou sem retornar resultado."))
 
 
 def send_to_self(message: str) -> tuple[bool, str]:
